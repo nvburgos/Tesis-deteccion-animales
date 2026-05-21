@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Detection {
+  id          Int      @id @default(autoincrement())
+  imagePath   String
+  species     String
+  confidence  Float
+  location    String
+  priority    String
+  x1          Float?
+  y1          Float?
+  x2          Float?
+  y2          Float?
+  createdAt   DateTime @default(now())
+}

@@ -1,0 +1,27 @@
+{
+  "name": "wildlife-ai-ui",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "lucide-react": "latest",
+    "next": "latest",
+    "prisma": "^6.19.3",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

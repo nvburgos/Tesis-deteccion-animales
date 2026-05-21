@@ -1,0 +1,23 @@
+# Node.js
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Variables de entorno
+.env
+.env.local
+
+# VS Code
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db
