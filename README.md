@@ -1,14 +1,14 @@
 # WildlifeAI
 
-Dashboard inteligente para analizar imagenes de camaras trampa con Next.js, Prisma, SQLite y un script Python preparado para Ultralytics YOLO.
+Dashboard inteligente para analizar imagenes de camaras trampa con Next.js, Prisma, SQLite y Ultralytics YOLO.
 
 ## Requisitos
 
 - Node.js
-- Python 3.11 o 3.12 recomendado
-- Opcional para YOLO real: Ultralytics YOLO
+- Python 3.11 o 3.12
+- Ultralytics YOLO
 
-No uses Python alpha/beta para YOLO. Si `python --version` muestra algo como `Python 3.15.0a7`, instala Python 3.11 o 3.12 porque `torch` y `ultralytics` pueden no tener paquetes compatibles.
+No uses Python alpha/beta. Si `python --version` muestra algo como `Python 3.15.0a7`, instala Python 3.11 o 3.12 porque `torch` y `ultralytics` pueden no tener paquetes compatibles.
 
 ## Ejecutar
 
@@ -26,12 +26,12 @@ http://localhost:3000
 
 ## Funcionalidad
 
-- Dashboard con metricas calculadas desde la base de datos.
+- Dashboard con metricas calculadas desde SQLite.
 - Tabla de detecciones recientes con especie, ubicacion, prioridad, fecha y confianza.
-- Boton `Nueva Observación` para cargar imagenes.
+- Boton `Nueva Observacion` para cargar imagenes.
 - Endpoint `POST /api/analyze` que guarda la imagen, ejecuta `python/predict.py`, calcula prioridad y almacena el resultado.
 - Endpoint `GET /api/detections` que devuelve detecciones y metricas actualizadas.
-- SQLite + Prisma para persistencia local.
+- Entrenamiento local con Ultralytics YOLO mediante `python/train.py`.
 
 ## Estructura
 
@@ -41,30 +41,24 @@ wildlife-ai-ui/
 |   +-- schema.prisma
 +-- python/
 |   +-- predict.py
-|   +-- best.pt              # modelo personalizado futuro
+|   +-- train.py
+|   +-- dataset.yaml
+|   +-- dataset/
+|   |   +-- images/train/
+|   |   +-- images/val/
+|   |   +-- labels/train/
+|   |   +-- labels/val/
+|   +-- best.pt
 +-- public/
 |   +-- uploads/
 +-- src/
-|   +-- app/
-|   |   +-- api/
-|   |   |   +-- analyze/route.ts
-|   |   |   +-- detections/route.ts
-|   |   +-- globals.css
-|   |   +-- layout.tsx
-|   |   +-- page.tsx
-|   +-- components/
-|   |   +-- Dashboard.tsx
+|   +-- app/api/analyze/route.ts
+|   +-- app/api/detections/route.ts
+|   +-- components/Dashboard.tsx
 |   +-- lib/
-|       +-- database.ts
-|       +-- detections.ts
-|       +-- prisma.ts
 ```
 
-## YOLO
-
-`python/predict.py` intenta cargar `python/best.pt`. Si no existe, usa `yolov8n.pt`. Si `ultralytics` no esta instalado, devuelve una prediccion de demostracion para que el flujo completo siga funcionando durante desarrollo.
-
-Para usar deteccion real:
+## Configurar Python
 
 ```bash
 py -3.12 -m venv .venv
@@ -73,16 +67,56 @@ python -m pip install --upgrade pip
 python -m pip install -r python\requirements.txt
 ```
 
-Luego coloca el modelo entrenado como:
+En `.env`:
+
+```env
+DATABASE_URL="file:./dev.db"
+YOLO_MODEL_PATH="python/best.pt"
+PYTHON_BIN=".venv\\Scripts\\python.exe"
+```
+
+## Entrenar modelo
+
+Coloca tu dataset etiquetado en formato YOLO:
+
+```text
+python/dataset/
++-- images/
+|   +-- train/
+|   +-- val/
++-- labels/
+    +-- train/
+    +-- val/
+```
+
+Las clases deben coincidir con `python/dataset.yaml`:
+
+```text
+0: Jaguar
+1: Tapir Amazonico
+2: Venado Cola Blanca
+```
+
+Cada imagen debe tener un `.txt` con anotaciones YOLO en la carpeta `labels` correspondiente.
+
+Entrena:
+
+```bash
+npm run train:yolo
+```
+
+El script copia automaticamente el mejor peso a:
 
 ```text
 python/best.pt
 ```
 
-El entrenamiento recomendado debe hacerse con Ultralytics YOLO y dataset etiquetado en formato YOLO.
+Despues reinicia Next:
 
-Si tienes varias versiones de Python, puedes indicar a Next que use el Python del entorno virtual:
-
-```env
-PYTHON_BIN=".venv\\Scripts\\python.exe"
+```bash
+npm run dev
 ```
+
+## Nota sobre yolov8n.pt
+
+`yolov8n.pt` es un modelo base entrenado con COCO. No detecta correctamente especies amazonicas como jaguar, tapir amazonico o venado cola blanca. Por eso la API exige `python/best.pt` y evita guardar detecciones falsas cuando falta el modelo entrenado.

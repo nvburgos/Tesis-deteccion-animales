@@ -1,4 +1,4 @@
-export const threatenedSpecies = new Set(['jaguar', 'tapir amazonico', 'tapir amazónico'])
+export const threatenedSpecies = new Set(['jaguar', 'leopard', 'tapir amazonico'])
 
 export function normalizeSpecies(species: string) {
   return species

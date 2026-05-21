@@ -10,6 +10,11 @@ build/
 venv/
 __pycache__/
 *.pyc
+python/dataset/
+python/runs/
+python/best.pt
+*.pt
+!python/.gitkeep
 
 # Variables de entorno
 .env

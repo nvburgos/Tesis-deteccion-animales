@@ -8,7 +8,9 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "train:yolo": ".venv\\Scripts\\python.exe python\\train.py",
+    "predict:yolo": ".venv\\Scripts\\python.exe python\\predict.py"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -16,6 +16,10 @@ type PredictionResult = {
   species: string
   confidence: number
   coordinates?: [number, number, number, number] | null
+  error?: string
+  warning?: string
+  model?: string
+  rawLabel?: string
 }
 
 function sanitizeFilename(filename: string) {
@@ -78,6 +82,19 @@ export async function POST(request: Request) {
   })
 
   const prediction = parsePrediction(stdout)
+
+  if (prediction.error) {
+    return NextResponse.json(
+      {
+        error: prediction.error,
+        species: prediction.species,
+        confidence: prediction.confidence,
+        warning: prediction.warning
+      },
+      { status: 422 }
+    )
+  }
+
   const priority = calculatePriority(prediction.species, prediction.confidence)
   const coordinates = prediction.coordinates ?? null
 
