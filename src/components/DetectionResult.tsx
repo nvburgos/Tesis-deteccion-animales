@@ -4,21 +4,22 @@ import { AlertTriangle, CheckCircle2, SearchX } from 'lucide-react'
 import type { DetectionResultData } from './dashboardTypes'
 
 function formatConfidence(confidence: number) {
-  return `${Math.round(confidence * 100)}%`
+  const percent = confidence <= 1 ? confidence * 100 : confidence
+  return `${Math.round(percent)}%`
 }
 
 export default function DetectionResult({ result }: { result: DetectionResultData | null }) {
-  const hasSpecies = Boolean(result?.species)
+  const hasSpecies = Boolean(result?.species && result.species !== 'Sin deteccion')
 
   return (
-    <section className="resultCard" aria-label="Resultado de detección">
+    <section className="resultCard" aria-label="Resultado de deteccion">
       <div className="resultHeading">
         <span className={hasSpecies ? 'resultIcon resultSuccess' : 'resultIcon'}>
           {hasSpecies ? <CheckCircle2 size={24} /> : <SearchX size={24} />}
         </span>
         <div>
-          <h2>Resultado del análisis</h2>
-          <p>{result ? 'Predicción generada para la imagen cargada.' : 'Aún no hay una imagen analizada.'}</p>
+          <h2>Resultado del analisis</h2>
+          <p>{result ? 'Prediccion generada para la imagen cargada.' : 'Aun no hay una imagen analizada.'}</p>
         </div>
       </div>
 
@@ -26,7 +27,7 @@ export default function DetectionResult({ result }: { result: DetectionResultDat
         <div className="resultGrid">
           <div>
             <span>Especie detectada</span>
-            <strong>{result.species || 'No se detectó ningún animal'}</strong>
+            <strong>{result.species || 'Sin deteccion'}</strong>
           </div>
           <div>
             <span>Confianza</span>
@@ -40,7 +41,7 @@ export default function DetectionResult({ result }: { result: DetectionResultDat
       ) : (
         <div className="emptyResult">
           <AlertTriangle size={20} />
-          <span>Selecciona una imagen y presiona Analizar imagen para ver la detección.</span>
+          <span>Selecciona una imagen y presiona Analizar imagen para ver la deteccion.</span>
         </div>
       )}
 

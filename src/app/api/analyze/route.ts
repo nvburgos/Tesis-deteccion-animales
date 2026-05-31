@@ -89,6 +89,9 @@ export async function POST(request: Request) {
         error: prediction.error,
         species: prediction.species,
         confidence: prediction.confidence,
+        imagePath: publicPath,
+        location,
+        priority: calculatePriority(prediction.species, prediction.confidence),
         warning: prediction.warning
       },
       { status: 422 }

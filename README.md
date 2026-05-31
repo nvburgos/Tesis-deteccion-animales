@@ -15,7 +15,7 @@ El proyecto tiene una interfaz web funcional en Next.js con React y TypeScript. 
 - Renderiza una tarjeta de resultado con especie, confianza y prioridad.
 - Mantiene tarjetas superiores de metricas.
 - Mantiene una tabla de detecciones recientes.
-- Simula una respuesta temporal si todavia no existe un backend disponible en `POST /predict`.
+- Envia la imagen real al endpoint interno `POST /api/analyze`.
 
 Tambien existe una implementacion previa de backend dentro de Next.js usando `POST /api/analyze`, Prisma, SQLite y un script Python con YOLO. Esa parte sirve como base para conectar el flujo definitivo con FastAPI o ajustar el frontend para usar la API interna de Next.
 
@@ -58,9 +58,9 @@ Interfaz Next.js / React
   |
   | selecciona imagen
   | preview local
-  | POST /predict
+  | POST /api/analyze
   v
-Backend IA futuro FastAPI
+Backend interno Next.js
   |
   | procesa imagen con YOLO
   v
@@ -73,16 +73,16 @@ Dashboard muestra resultado y actualiza tabla
 Actualmente el frontend llama a:
 
 ```text
-POST /predict
+POST /api/analyze
 ```
 
-Si ese endpoint no existe, la interfaz usa esta respuesta simulada:
+La interfaz ya no usa respuestas simuladas en frontend. Muestra la respuesta real del backend.
 
 ```json
 {
-  "species": "Jaguar",
-  "confidence": 0.96,
-  "priority": "Alta prioridad"
+  "species": "Leopard",
+  "confidence": 48.64,
+  "priority": "Normal"
 }
 ```
 
@@ -131,8 +131,6 @@ wildlife-ai-ui/
 |   |   +-- StatsCards.tsx
 |   |   +-- UploadImage.tsx
 |   |   +-- dashboardTypes.ts
-|   +-- data/
-|   |   +-- mockData.ts
 |   +-- lib/
 |       +-- database.ts
 |       +-- detections.ts
@@ -194,12 +192,6 @@ wildlife-ai-ui/
 | `src/lib/database.ts` | Crea la tabla `Detection` si no existe y carga datos iniciales de ejemplo si la base esta vacia. |
 | `src/lib/detections.ts` | Normaliza nombres de especies, calcula prioridad y formatea fechas relativas. |
 
-### Datos mock
-
-| Archivo | Descripcion |
-| --- | --- |
-| `src/data/mockData.ts` | Datos simulados anteriores para metricas y detecciones. Actualmente no es la fuente principal del nuevo dashboard. |
-
 ### Prisma y base de datos
 
 | Archivo | Descripcion |
@@ -229,7 +221,7 @@ model Detection {
 
 | Archivo | Descripcion |
 | --- | --- |
-| `python/predict.py` | Ejecuta prediccion con YOLO sobre una imagen. Retorna JSON con especie, confianza, coordenadas y modelo usado. |
+| `python/predict.py` | Ejecuta prediccion con YOLO sobre una imagen usando `python/best.pt`. Actualmente solo acepta la clase real `leopard`; clases no soportadas devuelven `Sin deteccion`. |
 | `python/train.py` | Entrena un modelo YOLO usando `python/dataset/data.yaml` y copia el mejor peso a `python/best.pt`. |
 | `python/prepare_dataset.py` | Une datasets YOLO exportados, remapea clases y genera `python/dataset/data.yaml`. |
 | `python/update_labels.py` | Script auxiliar para incrementar IDs de clases en archivos `.txt` de labels. Usar con cuidado. |
@@ -357,11 +349,11 @@ No se recomienda usar versiones alpha o beta de Python porque `torch` y `ultraly
 2. Selecciona o arrastra una imagen.
 3. El navegador genera una vista previa local.
 4. El usuario presiona **Analizar imagen**.
-5. El frontend intenta enviar la imagen a `POST /predict`.
-6. Si no hay backend, se usa una prediccion simulada.
+5. El frontend envia la imagen a `POST /api/analyze`.
+6. El backend guarda la imagen, ejecuta `python/predict.py` y devuelve la prediccion real.
 7. Se muestra la tarjeta de resultado.
-8. Si existe una especie, se agrega una fila a detecciones recientes de la sesion.
-9. Las metricas superiores se recalculan en memoria.
+8. La tabla se recarga desde `GET /api/detections`.
+9. Las metricas superiores se recalculan con las detecciones reales cargadas.
 
 ### Flujo interno existente con Next API
 
@@ -373,9 +365,9 @@ No se recomienda usar versiones alpha o beta de Python porque `torch` y `ultraly
 6. Guarda deteccion en SQLite.
 7. Devuelve resultado al cliente.
 
-Este flujo existe, pero la nueva UI esta preparada para el backend futuro en `POST /predict`.
+Este es el flujo activo de la UI actual.
 
-## Contrato esperado para `POST /predict`
+## Contrato actual para `POST /api/analyze`
 
 El backend futuro debe recibir:
 
@@ -388,9 +380,13 @@ Respuesta esperada:
 
 ```json
 {
-  "species": "Jaguar",
-  "confidence": 0.96,
-  "priority": "Alta prioridad"
+  "species": "Leopard",
+  "confidence": 48.64,
+  "imagePath": "/uploads/archivo.jpg",
+  "location": "Camara 01 | Zona Norte",
+  "priority": "Normal",
+  "createdAt": "2026-05-31T09:36:00.000Z",
+  "coordinates": [312.25, 0, 510, 288]
 }
 ```
 
@@ -398,10 +394,10 @@ Tambien puede responder cuando no detecta animal:
 
 ```json
 {
-  "species": null,
+  "species": "Sin deteccion",
   "confidence": 0,
   "priority": "Revision manual",
-  "message": "No se detecto ningun animal en la imagen."
+  "coordinates": null
 }
 ```
 
@@ -456,7 +452,8 @@ python/best.pt
 - Carga local de imagen con drag and drop o selector de archivo.
 - Vista previa de imagen.
 - Boton de analisis con estado de carga.
-- Resultado simulado cuando no existe `POST /predict`.
+- Envio real de imagen a `POST /api/analyze`.
+- Log en consola del navegador con `console.log("Respuesta backend:", data)`.
 - Calculo de metricas de la sesion.
 - Tabla de detecciones recientes en memoria.
 - Build de Next.js.
@@ -464,25 +461,25 @@ python/best.pt
 - Endpoints internos `GET /api/detections` y `POST /api/analyze`.
 - Persistencia SQLite para el flujo interno `/api/analyze`.
 - Scripts base para preparar dataset, entrenar YOLO y predecir.
+- Prediccion Python sin fallback por nombre de archivo. Si YOLO falla, devuelve `Sin deteccion` con error controlado.
 
 ## Que falta o esta pendiente
 
-- Crear backend Python FastAPI con endpoint `POST /predict`.
-- Conectar el frontend al backend real de FastAPI.
-- Decidir si se mantiene `POST /api/analyze` o si se reemplaza totalmente por FastAPI.
+- Crear backend Python FastAPI si se decide separar la IA del backend Next.js.
+- Conectar el frontend a FastAPI solo cuando exista ese backend.
+- Decidir si se mantiene `POST /api/analyze` o si se reemplaza por FastAPI.
 - Unificar formato de confianza:
   - Frontend nuevo espera `0.96`.
   - Endpoint interno actual puede manejar valores como `96`.
 - Unificar prioridades:
   - Frontend usa `Normal`, `Alta prioridad`, `Revision manual`.
   - Utilidad interna actual devuelve `Alta` o `Normal`.
-- Guardar en base de datos las detecciones generadas desde el nuevo flujo `/predict`.
+- Persistir tambien los errores de ejecucion YOLO si se desea auditarlos historicamente.
 - Mostrar cajas de deteccion sobre la imagen usando coordenadas `x1`, `y1`, `x2`, `y2`.
 - Agregar seleccion real de camara o ubicacion.
 - Agregar autenticacion si el sistema se usara por varios usuarios.
 - Agregar manejo de errores visual para imagen invalida, modelo no disponible o backend caido.
-- Revisar `python/predict.py`: el fallback llama a `SPECIES_BY_HINT`, pero esa constante no esta definida actualmente.
-- Revisar `src/data/mockData.ts`: puede eliminarse o actualizarse si ya no se usa.
+- Ampliar `DISPLAY_SPECIES` solo cuando `best.pt` realmente contenga nuevas clases entrenadas.
 - Agregar pruebas automatizadas de componentes y endpoints.
 - Documentar despliegue cuando se defina ambiente final.
 
@@ -526,7 +523,7 @@ Archivos modificados:
 - `src/components/dashboardTypes.ts`
 - `src/app/globals.css`
 
-Estado: funcional en frontend con respuesta simulada para `POST /predict`.
+Estado: reemplazado. El frontend ahora usa `POST /api/analyze` y ya no usa respuesta simulada.
 
 ### 2026-05-31
 
@@ -538,3 +535,31 @@ Archivos modificados:
 
 Estado: documentacion funcional.
 
+### 2026-05-31
+
+Cambio: Correccion de `python/predict.py` para eliminar predicciones falsas por nombre de archivo y limitar la salida a clases reales del modelo.
+
+Archivos modificados:
+
+- `python/predict.py`
+- `README.md`
+
+Estado: funcional. El script usa `python/best.pt`, imprime las clases reales del modelo con `model.names`, solo soporta `leopard` por ahora y devuelve `Sin deteccion` si YOLO falla o detecta una clase no soportada.
+
+### 2026-05-31
+
+Cambio: Correccion del flujo completo de analisis para eliminar el resultado quemado de Jaguar en frontend.
+
+Archivos modificados:
+
+- `src/components/Dashboard.tsx`
+- `src/components/DetectionResult.tsx`
+- `src/components/RecentDetections.tsx`
+- `src/components/dashboardTypes.ts`
+- `src/app/api/analyze/route.ts`
+- `src/lib/database.ts`
+- `src/lib/detections.ts`
+- `src/data/mockData.ts`
+- `README.md`
+
+Estado: funcional. El boton `Analizar imagen` usa `POST /api/analyze`, registra `Respuesta backend` en consola, recarga la tabla desde `GET /api/detections`, no usa datos simulados y se eliminaron seeds antiguos de Jaguar/Venado/Tapir en SQLite.

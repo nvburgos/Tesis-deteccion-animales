@@ -5,34 +5,7 @@ import sys
 
 DISPLAY_SPECIES = {
     "leopard": "Leopard",
-    "boar": "Jabali",
-    "cheetah": "Chita",
-    "elephant": "Elefante",
-    "lion": "Leon",
-    "deer": "Venado",
 }
-
-
-
-def fallback_prediction(image_path):
-    filename = os.path.basename(image_path).lower()
-
-    for hint, prediction in SPECIES_BY_HINT.items():
-        if hint in filename:
-            species, confidence, box = prediction
-            return {
-                "species": species,
-                "confidence": confidence,
-                "coordinates": box,
-                "model": "filename-fallback",
-            }
-
-    return {
-        "species": "Sin deteccion",
-        "confidence": 0,
-        "coordinates": None,
-        "warning": "No trained YOLO model available and filename has no species hint.",
-    }
 
 
 def normalize_label(label):
@@ -45,20 +18,12 @@ def to_display_species(label):
     if normalized in DISPLAY_SPECIES:
         return DISPLAY_SPECIES[normalized]
 
-    for hint, species in DISPLAY_SPECIES.items():
-        if hint in normalized:
-            return species
-
-    return normalized.title()
+    return None
 
 
 def is_configured_species(label):
     normalized = normalize_label(label)
-
-    if normalized in DISPLAY_SPECIES:
-        return True
-
-    return any(hint in normalized for hint in DISPLAY_SPECIES)
+    return normalized in DISPLAY_SPECIES
 
 
 def get_model_path():
@@ -74,24 +39,12 @@ def predict_with_yolo(image_path):
     from ultralytics import YOLO
 
     model_path = get_model_path()
-    allow_base_model = os.environ.get("ALLOW_BASE_MODEL", "false").lower() == "true"
-    using_custom_model = os.path.exists(model_path)
 
-    if not using_custom_model:
-        if not allow_base_model:
-            return {
-                "species": "Modelo no configurado",
-                "confidence": 0,
-                "coordinates": None,
-                "error": (
-                    f"Trained model not found at {model_path}. "
-                    "Train or copy python/best.pt before analyzing images."
-                ),
-            }
-
-        model_path = os.path.join(os.getcwd(), "yolov8n.pt")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"YOLO model not found at {model_path}")
 
     model = YOLO(model_path)
+    print(f"YOLO model classes: {model.names}")
     results = model(image_path, verbose=False)
 
     if not results or len(results[0].boxes) == 0:
@@ -106,22 +59,20 @@ def predict_with_yolo(image_path):
     best_index = int(boxes.conf.argmax().item())
     class_id = int(boxes.cls[best_index].item())
     raw_label = results[0].names[class_id]
-    species = to_display_species(raw_label)
-    confidence = round(float(boxes.conf[best_index].item()) * 100, 2)
-    coordinates = [round(float(value), 2) for value in boxes.xyxy[best_index].tolist()]
 
-    if not using_custom_model and not is_configured_species(raw_label):
+    if not is_configured_species(raw_label):
         return {
             "species": "Sin deteccion",
             "confidence": 0,
             "coordinates": None,
             "rawLabel": raw_label,
             "model": os.path.basename(model_path),
-            "warning": (
-                f"Unsupported YOLO label '{raw_label}'. "
-                "Use python/best.pt trained with Jaguar, Tapir Amazonico and Venado Cola Blanca."
-            ),
+            "warning": f"Unsupported YOLO label '{raw_label}'.",
         }
+
+    species = to_display_species(raw_label)
+    confidence = round(float(boxes.conf[best_index].item()) * 100, 2)
+    coordinates = [round(float(value), 2) for value in boxes.xyxy[best_index].tolist()]
 
     return {
         "species": species,
@@ -141,9 +92,13 @@ def main():
 
     try:
         result = predict_with_yolo(image_path)
-    except Exception as error:
-        result = fallback_prediction(image_path)
-        result["warning"] = f"YOLO fallback used: {error}"
+    except Exception:
+        result = {
+            "species": "Sin deteccion",
+            "confidence": 0,
+            "coordinates": None,
+            "error": "No se pudo ejecutar el modelo YOLO",
+        }
 
     print(json.dumps(result))
 

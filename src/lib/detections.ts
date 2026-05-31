@@ -19,8 +19,12 @@ export function normalizeSpecies(species: string) {
 export function calculatePriority(species: string, confidence: number) {
   const normalizedSpecies = normalizeSpecies(species)
 
+  if (normalizedSpecies === 'sin deteccion' || confidence <= 0) {
+    return 'Revision manual'
+  }
+
   if (threatenedSpecies.has(normalizedSpecies) || confidence > 95) {
-    return 'Alta'
+    return 'Alta prioridad'
   }
 
   return 'Normal'

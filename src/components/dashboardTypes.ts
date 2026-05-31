@@ -1,10 +1,13 @@
-export type Priority = 'Normal' | 'Alta prioridad' | 'Revisión manual'
+export type Priority = 'Normal' | 'Alta prioridad' | 'Revision manual'
 
 export type DetectionResultData = {
   species: string | null
   confidence: number
   priority: Priority
   message?: string
+  imagePath?: string
+  location?: string
+  createdAt?: string
 }
 
 export type RecentDetection = {
@@ -15,6 +18,7 @@ export type RecentDetection = {
   location: string
   priority: Priority
   createdAt: string
+  time?: string
 }
 
 export type DashboardMetric = {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DetectionResult from './DetectionResult'
 import Header from './Header'
 import RecentDetections from './RecentDetections'
@@ -9,56 +9,96 @@ import StatsCards from './StatsCards'
 import UploadImage from './UploadImage'
 import type { DashboardMetric, DetectionResultData, Priority, RecentDetection } from './dashboardTypes'
 
-const simulatedResult: DetectionResultData = {
-  species: 'Jaguar',
-  confidence: 0.96,
-  priority: 'Alta prioridad'
+type DashboardData = {
+  metrics: DashboardMetric[]
+  detections: RecentDetection[]
 }
 
-function getPriority(species: string | null, confidence: number): Priority {
-  if (!species) {
-    return 'Revisión manual'
-  }
+type BackendAnalyzeResponse = Partial<DetectionResultData> & {
+  error?: string
+  warning?: string
+}
 
-  if (confidence >= 0.9 || species.toLowerCase() === 'jaguar') {
+function toPercent(confidence: number) {
+  return confidence <= 1 ? confidence * 100 : confidence
+}
+
+function normalizePriority(priority?: string, species?: string | null, confidence = 0): Priority {
+  if (priority === 'Alta' || priority === 'Alta prioridad') {
     return 'Alta prioridad'
   }
 
-  return confidence >= 0.65 ? 'Normal' : 'Revisión manual'
+  if (priority === 'Revision manual' || priority === 'Revisión manual') {
+    return 'Revision manual'
+  }
+
+  if (!species || species === 'Sin deteccion' || confidence <= 0) {
+    return 'Revision manual'
+  }
+
+  return 'Normal'
 }
 
-function normalizeResult(result: Partial<DetectionResultData>): DetectionResultData {
+function normalizeResult(result: BackendAnalyzeResponse): DetectionResultData {
   const species = result.species ?? null
-  const confidence = Number(result.confidence ?? 0)
-  const priority = result.priority ?? getPriority(species, confidence)
+  const confidence = toPercent(Number(result.confidence ?? 0))
 
   return {
     species,
     confidence,
-    priority,
-    message: species ? undefined : 'No se detectó ningún animal en la imagen. Se recomienda revisión manual.'
+    priority: normalizePriority(result.priority, species, confidence),
+    message:
+      result.message ??
+      result.error ??
+      (species === 'Sin deteccion' || !species ? 'No se detecto ningun animal en la imagen.' : undefined),
+    imagePath: result.imagePath,
+    location: result.location,
+    createdAt: result.createdAt
   }
 }
 
-async function predictImage(file: File): Promise<DetectionResultData> {
+function normalizeDetection(detection: RecentDetection): RecentDetection {
+  const confidence = toPercent(Number(detection.confidence ?? 0))
+
+  return {
+    ...detection,
+    confidence,
+    priority: normalizePriority(detection.priority, detection.species, confidence)
+  }
+}
+
+async function analyzeImage(file: File): Promise<DetectionResultData> {
   const formData = new FormData()
   formData.append('image', file)
+  formData.append('location', 'Camara 01 | Zona Norte')
 
-  try {
-    const response = await fetch('/predict', {
-      body: formData,
-      method: 'POST'
-    })
+  const response = await fetch('/api/analyze', {
+    body: formData,
+    method: 'POST'
+  })
 
-    if (!response.ok) {
-      throw new Error('Backend no disponible')
-    }
+  const data = (await response.json()) as BackendAnalyzeResponse
+  console.log('Respuesta backend:', data)
 
-    const result = (await response.json()) as Partial<DetectionResultData>
-    return normalizeResult(result)
-  } catch {
-    await new Promise((resolve) => setTimeout(resolve, 900))
-    return simulatedResult
+  if (!response.ok && !data.species) {
+    throw new Error(data.error ?? 'No se pudo analizar la imagen')
+  }
+
+  return normalizeResult(data)
+}
+
+async function loadDetections(): Promise<DashboardData> {
+  const response = await fetch('/api/detections', { cache: 'no-store' })
+
+  if (!response.ok) {
+    throw new Error('No se pudieron cargar las detecciones')
+  }
+
+  const data = (await response.json()) as DashboardData
+
+  return {
+    metrics: data.metrics,
+    detections: data.detections.map(normalizeDetection)
   }
 }
 
@@ -70,21 +110,29 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    loadDetections()
+      .then((data) => setDetections(data.detections))
+      .catch((loadError: unknown) => {
+        setError(loadError instanceof Error ? loadError.message : 'Error cargando detecciones')
+      })
+  }, [])
+
   const metrics = useMemo<DashboardMetric[]>(() => {
     const analyzed = detections.length
-    const detectedSpecies = new Set(detections.map((detection) => detection.species)).size
+    const detectedSpecies = new Set(
+      detections
+        .map((detection) => detection.species)
+        .filter((species) => species && species !== 'Sin deteccion')
+    ).size
     const averageConfidence =
-      analyzed > 0
-        ? Math.round(
-            (detections.reduce((total, detection) => total + detection.confidence, 0) / analyzed) * 100
-          )
-        : 0
+      analyzed > 0 ? Math.round(detections.reduce((total, detection) => total + detection.confidence, 0) / analyzed) : 0
 
     return [
       {
-        label: 'Imágenes analizadas',
+        label: 'Imagenes analizadas',
         value: analyzed.toString(),
-        detail: 'Total procesado en esta sesión'
+        detail: 'Total procesado en esta sesion'
       },
       {
         label: 'Especies detectadas',
@@ -115,25 +163,11 @@ export default function Dashboard() {
     setError('')
 
     try {
-      const prediction = await predictImage(selectedFile)
+      const prediction = await analyzeImage(selectedFile)
       setResult(prediction)
 
-      const detectedSpecies = prediction.species
-
-      if (detectedSpecies) {
-        setDetections((current) => [
-          {
-            id: Date.now(),
-            imagePath: imagePreview,
-            species: detectedSpecies,
-            confidence: prediction.confidence,
-            location: 'Cámara 01 | Zona Norte',
-            priority: prediction.priority,
-            createdAt: new Date().toISOString()
-          },
-          ...current
-        ])
-      }
+      const nextData = await loadDetections()
+      setDetections(nextData.detections)
     } catch (analysisError: unknown) {
       setError(analysisError instanceof Error ? analysisError.message : 'Error analizando la imagen')
     } finally {

@@ -6,7 +6,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
   const className =
     priority === 'Alta prioridad'
       ? 'priorityPill priorityHigh'
-      : priority === 'Revisión manual'
+      : priority === 'Revision manual'
         ? 'priorityPill priorityReview'
         : 'priorityPill priorityNormal'
 
@@ -14,7 +14,8 @@ function PriorityBadge({ priority }: { priority: Priority }) {
 }
 
 function formatConfidence(confidence: number) {
-  return `${Math.round(confidence * 100)}%`
+  const percent = confidence <= 1 ? confidence * 100 : confidence
+  return `${Math.round(percent)}%`
 }
 
 export default function RecentDetections({ detections }: { detections: RecentDetection[] }) {
@@ -38,7 +39,7 @@ export default function RecentDetections({ detections }: { detections: RecentDet
             <tr>
               <th>Imagen</th>
               <th>Especie detectada</th>
-              <th>Cámara o ubicación</th>
+              <th>Camara o ubicacion</th>
               <th>Prioridad</th>
               <th>Fecha/hora</th>
               <th>Confianza</th>
@@ -49,11 +50,15 @@ export default function RecentDetections({ detections }: { detections: RecentDet
               detections.map((detection) => (
                 <tr key={detection.id}>
                   <td>
-                    <img
-                      alt={`Imagen analizada: ${detection.species}`}
-                      className="wildlifeImage"
-                      src={detection.imagePath}
-                    />
+                    {detection.imagePath ? (
+                      <img
+                        alt={`Imagen analizada: ${detection.species}`}
+                        className="wildlifeImage"
+                        src={detection.imagePath}
+                      />
+                    ) : (
+                      <span className="wildlifeThumb" aria-hidden="true" />
+                    )}
                   </td>
                   <td className="speciesCell">{detection.species}</td>
                   <td>{detection.location}</td>
@@ -76,7 +81,7 @@ export default function RecentDetections({ detections }: { detections: RecentDet
             ) : (
               <tr>
                 <td className="emptyState" colSpan={6}>
-                  Aún no hay detecciones. Carga una imagen de cámara trampa para iniciar el análisis.
+                  Aun no hay detecciones. Carga una imagen de camara trampa para iniciar el analisis.
                 </td>
               </tr>
             )}
@@ -85,7 +90,7 @@ export default function RecentDetections({ detections }: { detections: RecentDet
       </div>
 
       <button className="historyButton" type="button">
-        Ver todas las detecciones históricas
+        Ver todas las detecciones historicas
       </button>
     </section>
   )
