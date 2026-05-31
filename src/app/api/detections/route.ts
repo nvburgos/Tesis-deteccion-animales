@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { seedDetectionsIfEmpty } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
 import { formatRelativeDate } from '@/lib/detections'
@@ -12,6 +12,10 @@ function toPublicDetection(detection: {
   confidence: number
   location: string
   priority: string
+  x1: number | null
+  y1: number | null
+  x2: number | null
+  y2: number | null
   createdAt: Date
 }) {
   return {
@@ -21,41 +25,87 @@ function toPublicDetection(detection: {
     confidence: Math.round(detection.confidence),
     location: detection.location,
     priority: detection.priority,
+    x1: detection.x1,
+    y1: detection.y1,
+    x2: detection.x2,
+    y2: detection.y2,
     createdAt: detection.createdAt.toISOString(),
     time: formatRelativeDate(detection.createdAt)
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   await seedDetectionsIfEmpty()
 
+  const searchParams = request.nextUrl.searchParams
+  const speciesFilter = searchParams.get('species')?.trim()
+  const dateFilter = searchParams.get('date')?.trim()
+  const limit = searchParams.get('limit')
+  const where: {
+    species?: string
+    createdAt?: {
+      gte?: Date
+      lt?: Date
+    }
+  } = {}
+
+  if (speciesFilter) {
+    where.species = speciesFilter
+  }
+
+  if (dateFilter) {
+    const start = new Date(`${dateFilter}T00:00:00`)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 1)
+    where.createdAt = { gte: start, lt: end }
+  }
+
   const detections = await prisma.detection.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
-    take: 20
+    ...(limit === 'all' ? {} : { take: 20 })
   })
 
   const total = await prisma.detection.count()
+  const totalDetections = await prisma.detection.count({
+    where: {
+      species: { not: 'Sin deteccion' },
+      confidence: { gt: 0 }
+    }
+  })
   const species = await prisma.detection.groupBy({
-    by: ['species']
+    by: ['species'],
+    where: {
+      species: { not: 'Sin deteccion' }
+    }
   })
   const confidence = await prisma.detection.aggregate({
-    _avg: { confidence: true }
+    _avg: { confidence: true },
+    where: {
+      species: { not: 'Sin deteccion' },
+      confidence: { gt: 0 }
+    }
   })
 
   return NextResponse.json({
     metrics: [
       {
-        label: 'Imagenes analizadas',
+        label: 'Total de imagenes analizadas',
         value: total.toLocaleString('es-ES'),
         detail: 'Total de registros procesados'
       },
       {
-        label: 'Especies',
+        label: 'Total de detecciones',
+        value: totalDetections.toLocaleString('es-ES'),
+        detail: 'Imagenes con animal detectado'
+      },
+      {
+        label: 'Especies detectadas',
         value: species.length.toString(),
         detail: 'Especies distintas detectadas'
       },
       {
-        label: 'Confianza',
+        label: 'Confianza promedio',
         value: `${Math.round(confidence._avg.confidence ?? 0)}%`,
         detail: 'Promedio de confianza YOLO'
       }

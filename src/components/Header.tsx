@@ -2,12 +2,20 @@
 
 import { Bell, Search } from 'lucide-react'
 
-export default function Header() {
+type HeaderProps = {
+  title?: string
+  subtitle?: string
+}
+
+export default function Header({
+  title = 'Deteccion automatizada de vida silvestre',
+  subtitle = 'Plataforma basada en IA para analizar imagenes de camaras trampa'
+}: HeaderProps) {
   return (
     <header className="appHeader">
       <div>
-        <h1>Detección automatizada de vida silvestre</h1>
-        <p>Plataforma basada en IA para analizar imágenes de cámaras trampa</p>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
       </div>
 
       <div className="headerActions">

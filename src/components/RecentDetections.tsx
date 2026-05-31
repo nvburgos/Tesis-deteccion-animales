@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { Priority, RecentDetection } from './dashboardTypes'
 
 function PriorityBadge({ priority }: { priority: Priority }) {
@@ -89,9 +90,9 @@ export default function RecentDetections({ detections }: { detections: RecentDet
         </table>
       </div>
 
-      <button className="historyButton" type="button">
+      <Link className="historyButton" href="/historial">
         Ver todas las detecciones historicas
-      </button>
+      </Link>
     </section>
   )
 }

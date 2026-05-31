@@ -1,10 +1,12 @@
 'use client'
 
-import { ChartNoAxesColumn, Goal, Microscope, type LucideIcon } from 'lucide-react'
+import { ChartNoAxesColumn, Goal, Microscope, ScanSearch, type LucideIcon } from 'lucide-react'
 import type { DashboardMetric } from './dashboardTypes'
 
 const metricIcons: Record<string, LucideIcon> = {
-  'Imágenes analizadas': ChartNoAxesColumn,
+  'Imagenes analizadas': ChartNoAxesColumn,
+  'Total de imagenes analizadas': ChartNoAxesColumn,
+  'Total de detecciones': ScanSearch,
   'Especies detectadas': Microscope,
   'Confianza promedio': Goal
 }
@@ -28,7 +30,7 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
 
 export default function StatsCards({ metrics }: { metrics: DashboardMetric[] }) {
   return (
-    <section className="metricsGrid" aria-label="Métricas principales">
+    <section className="metricsGrid" aria-label="Metricas principales">
       {metrics.map((metric) => (
         <MetricCard key={metric.label} metric={metric} />
       ))}

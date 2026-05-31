@@ -8,6 +8,7 @@ export type DetectionResultData = {
   imagePath?: string
   location?: string
   createdAt?: string
+  coordinates?: [number, number, number, number] | null
 }
 
 export type RecentDetection = {
@@ -19,6 +20,10 @@ export type RecentDetection = {
   priority: Priority
   createdAt: string
   time?: string
+  x1?: number | null
+  y1?: number | null
+  x2?: number | null
+  y2?: number | null
 }
 
 export type DashboardMetric = {

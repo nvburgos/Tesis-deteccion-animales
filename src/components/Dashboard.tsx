@@ -53,7 +53,8 @@ function normalizeResult(result: BackendAnalyzeResponse): DetectionResultData {
       (species === 'Sin deteccion' || !species ? 'No se detecto ningun animal en la imagen.' : undefined),
     imagePath: result.imagePath,
     location: result.location,
-    createdAt: result.createdAt
+    createdAt: result.createdAt,
+    coordinates: result.coordinates ?? null
   }
 }
 
@@ -120,6 +121,9 @@ export default function Dashboard() {
 
   const metrics = useMemo<DashboardMetric[]>(() => {
     const analyzed = detections.length
+    const totalDetections = detections.filter(
+      (detection) => detection.species !== 'Sin deteccion' && detection.confidence > 0
+    ).length
     const detectedSpecies = new Set(
       detections
         .map((detection) => detection.species)
@@ -133,6 +137,11 @@ export default function Dashboard() {
         label: 'Imagenes analizadas',
         value: analyzed.toString(),
         detail: 'Total procesado en esta sesion'
+      },
+      {
+        label: 'Total de detecciones',
+        value: totalDetections.toString(),
+        detail: 'Imagenes con animal detectado'
       },
       {
         label: 'Especies detectadas',

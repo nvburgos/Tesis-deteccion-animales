@@ -13,6 +13,9 @@ El proyecto tiene una interfaz web funcional en Next.js con React y TypeScript. 
 - Tiene boton **Analizar imagen**.
 - Muestra estado de procesamiento.
 - Renderiza una tarjeta de resultado con especie, confianza y prioridad.
+- Muestra la imagen analizada con caja de deteccion cuando el backend devuelve coordenadas.
+- Incluye pagina de historial con filtros por especie y fecha.
+- Incluye pagina de estadisticas con metricas principales.
 - Mantiene tarjetas superiores de metricas.
 - Mantiene una tabla de detecciones recientes.
 - Envia la imagen real al endpoint interno `POST /api/analyze`.
@@ -41,6 +44,7 @@ Tambien existe una implementacion previa de backend dentro de Next.js usando `PO
 - **Python**: scripts de preparacion, entrenamiento y prediccion.
 - **Ultralytics YOLO**: modelo de deteccion de objetos.
 - **YOLOv8**: base para entrenamiento y prediccion.
+- **Modelo actual**: `python/best.pt` detecta solo `leopard`. Todavia no representa las especies objetivo del Proyecto Sacha.
 
 ### Base de datos
 
@@ -119,11 +123,14 @@ wildlife-ai-ui/
 |   |   +-- api/
 |   |   |   +-- analyze/route.ts
 |   |   |   +-- detections/route.ts
+|   |   +-- estadisticas/page.tsx
 |   |   +-- globals.css
+|   |   +-- historial/page.tsx
 |   |   +-- layout.tsx
 |   |   +-- page.tsx
 |   +-- components/
 |   |   +-- Dashboard.tsx
+|   |   +-- DetectionImage.tsx
 |   |   +-- DetectionResult.tsx
 |   |   +-- Header.tsx
 |   |   +-- RecentDetections.tsx
@@ -161,6 +168,8 @@ wildlife-ai-ui/
 | Archivo | Descripcion |
 | --- | --- |
 | `src/app/page.tsx` | Pagina principal. Renderiza el componente `Dashboard`. |
+| `src/app/historial/page.tsx` | Pagina de historial con filtros por especie y fecha. |
+| `src/app/estadisticas/page.tsx` | Pagina de estadisticas con metricas y resumen por especie. |
 | `src/app/layout.tsx` | Layout raiz de Next.js. Define idioma `es`, metadata y carga estilos globales. |
 | `src/app/globals.css` | Estilos globales del dashboard: sidebar, header, cards, zona de carga, resultado, tabla y responsive. |
 
@@ -169,7 +178,7 @@ wildlife-ai-ui/
 | Archivo | Descripcion |
 | --- | --- |
 | `src/app/api/analyze/route.ts` | Endpoint `POST /api/analyze`. Recibe imagen, la guarda en `public/uploads`, ejecuta `python/predict.py`, calcula prioridad y guarda deteccion en SQLite. |
-| `src/app/api/detections/route.ts` | Endpoint `GET /api/detections`. Devuelve metricas y ultimas detecciones desde la base de datos. |
+| `src/app/api/detections/route.ts` | Endpoint `GET /api/detections`. Devuelve metricas, coordenadas y detecciones. Soporta `limit=all`, `species` y `date`. |
 
 ### Componentes React
 
@@ -180,6 +189,7 @@ wildlife-ai-ui/
 | `src/components/Header.tsx` | Encabezado principal con titulo de tesis y acciones visuales. |
 | `src/components/StatsCards.tsx` | Tarjetas superiores: imagenes analizadas, especies detectadas y confianza promedio. |
 | `src/components/UploadImage.tsx` | Area drag and drop, input file, vista previa y boton `Analizar imagen`. |
+| `src/components/DetectionImage.tsx` | Visor de imagen analizada con bounding box, etiqueta de especie, confianza y mensaje visual cuando no hay deteccion. |
 | `src/components/DetectionResult.tsx` | Tarjeta que muestra especie detectada, confianza, prioridad o mensaje de no deteccion. |
 | `src/components/RecentDetections.tsx` | Tabla de detecciones recientes con imagen, especie, ubicacion, prioridad, fecha/hora y confianza. |
 | `src/components/dashboardTypes.ts` | Tipos TypeScript compartidos: prioridad, resultado, deteccion reciente y metricas. |
@@ -223,9 +233,9 @@ model Detection {
 | --- | --- |
 | `python/predict.py` | Ejecuta prediccion con YOLO sobre una imagen usando `python/best.pt`. Actualmente solo acepta la clase real `leopard`; clases no soportadas devuelven `Sin deteccion`. |
 | `python/train.py` | Entrena un modelo YOLO usando `python/dataset/data.yaml` y copia el mejor peso a `python/best.pt`. |
-| `python/prepare_dataset.py` | Une datasets YOLO exportados, remapea clases y genera `python/dataset/data.yaml`. |
+| `python/prepare_dataset.py` | Valida datasets YOLO en `python/datasets_raw`, remapea clases objetivo y genera `python/dataset/data.yaml` solo si hay imagenes y labels validos. |
 | `python/update_labels.py` | Script auxiliar para incrementar IDs de clases en archivos `.txt` de labels. Usar con cuidado. |
-| `python/wildlife_classes.yaml` | Catalogo de clases objetivo para entrenamiento. |
+| `python/wildlife_classes.yaml` | Catalogo inicial de especies objetivo: jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma. |
 | `python/requirements.txt` | Dependencias Python necesarias. |
 | `python/datasets_raw/` | Carpeta donde se colocan datasets fuente exportados en formato YOLO. |
 
@@ -403,7 +413,19 @@ Tambien puede responder cuando no detecta animal:
 
 ## Entrenamiento YOLO
 
-Colocar datasets fuente en:
+El modelo actual `python/best.pt` se conserva y por ahora solo detecta `leopard`. Todavia falta recibir imagenes reales del Proyecto Sacha para entrenar las especies objetivo de WildlifeAI.
+
+Especies objetivo iniciales:
+
+```text
+0: jaguar
+1: tapir_amazonico
+2: venado_cola_blanca
+3: ocelote
+4: puma
+```
+
+Cuando existan imagenes reales anotadas, colocar datasets fuente en:
 
 ```text
 python/datasets_raw/
@@ -419,7 +441,7 @@ python/datasets_raw/
 |   +-- train/labels/
 |   +-- valid/images/
 |   +-- valid/labels/
-+-- leopard/
++-- tapir_amazonico/
     +-- data.yaml
     +-- train/images/
     +-- train/labels/
@@ -433,7 +455,9 @@ Preparar dataset:
 npm run prepare:dataset
 ```
 
-Entrenar:
+`prepare_dataset.py` valida que existan imagenes y labels. Si faltan carpetas, imagenes o archivos `.txt`, muestra un mensaje claro, no reemplaza `python/dataset` y no se debe entrenar.
+
+Entrenar solo despues de recibir imagenes reales del Proyecto Sacha, preparar correctamente el dataset y revisar `python/dataset/data.yaml`:
 
 ```bash
 npm run train:yolo
@@ -454,6 +478,9 @@ python/best.pt
 - Boton de analisis con estado de carga.
 - Envio real de imagen a `POST /api/analyze`.
 - Log en consola del navegador con `console.log("Respuesta backend:", data)`.
+- Visualizacion de bounding box con especie y confianza sobre la imagen analizada.
+- Pagina `/historial` con filtro por especie y fecha.
+- Pagina `/estadisticas` con total de imagenes, total de detecciones, especies detectadas y confianza promedio.
 - Calculo de metricas de la sesion.
 - Tabla de detecciones recientes en memoria.
 - Build de Next.js.
@@ -462,10 +489,16 @@ python/best.pt
 - Persistencia SQLite para el flujo interno `/api/analyze`.
 - Scripts base para preparar dataset, entrenar YOLO y predecir.
 - Prediccion Python sin fallback por nombre de archivo. Si YOLO falla, devuelve `Sin deteccion` con error controlado.
+- Configuracion inicial de especies objetivo en `python/wildlife_classes.yaml`.
+- Validaciones en `prepare_dataset.py` para no preparar datasets incompletos.
 
 ## Que falta o esta pendiente
 
 - Crear backend Python FastAPI si se decide separar la IA del backend Next.js.
+- Recibir imagenes reales anotadas del Proyecto Sacha.
+- Colocar los datasets reales en `python/datasets_raw`.
+- Ejecutar `npm run prepare:dataset` solo cuando existan imagenes y labels reales.
+- Entrenar YOLO solo despues de validar el dataset preparado.
 - Conectar el frontend a FastAPI solo cuando exista ese backend.
 - Decidir si se mantiene `POST /api/analyze` o si se reemplaza por FastAPI.
 - Unificar formato de confianza:
@@ -475,11 +508,12 @@ python/best.pt
   - Frontend usa `Normal`, `Alta prioridad`, `Revision manual`.
   - Utilidad interna actual devuelve `Alta` o `Normal`.
 - Persistir tambien los errores de ejecucion YOLO si se desea auditarlos historicamente.
-- Mostrar cajas de deteccion sobre la imagen usando coordenadas `x1`, `y1`, `x2`, `y2`.
+- Mejorar la visualizacion de cajas cuando existan multiples detecciones en una misma imagen.
 - Agregar seleccion real de camara o ubicacion.
 - Agregar autenticacion si el sistema se usara por varios usuarios.
 - Agregar manejo de errores visual para imagen invalida, modelo no disponible o backend caido.
 - Ampliar `DISPLAY_SPECIES` solo cuando `best.pt` realmente contenga nuevas clases entrenadas.
+- Actualizar `python/predict.py` despues de entrenar un nuevo `best.pt` con jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma.
 - Agregar pruebas automatizadas de componentes y endpoints.
 - Documentar despliegue cuando se defina ambiente final.
 
@@ -563,3 +597,38 @@ Archivos modificados:
 - `README.md`
 
 Estado: funcional. El boton `Analizar imagen` usa `POST /api/analyze`, registra `Respuesta backend` en consola, recarga la tabla desde `GET /api/detections`, no usa datos simulados y se eliminaron seeds antiguos de Jaguar/Venado/Tapir en SQLite.
+
+### 2026-05-31
+
+Cambio: Mejora visual de WildlifeAI con bounding boxes, historial filtrable y estadisticas.
+
+Archivos modificados:
+
+- `src/components/DetectionImage.tsx`
+- `src/components/DetectionResult.tsx`
+- `src/components/Dashboard.tsx`
+- `src/components/RecentDetections.tsx`
+- `src/components/Sidebar.tsx`
+- `src/components/Header.tsx`
+- `src/components/StatsCards.tsx`
+- `src/components/dashboardTypes.ts`
+- `src/app/api/analyze/route.ts`
+- `src/app/api/detections/route.ts`
+- `src/app/historial/page.tsx`
+- `src/app/estadisticas/page.tsx`
+- `src/app/globals.css`
+- `README.md`
+
+Estado: funcional. El resultado muestra la imagen con caja de deteccion, especie y confianza cuando hay coordenadas; si no hay deteccion muestra "No se detecto ningun animal". Se agregaron paginas de historial y estadisticas, filtros por especie/fecha, y metricas de imagenes analizadas, detecciones, especies y confianza promedio.
+
+### 2026-05-31
+
+Cambio: Preparacion de configuracion de especies objetivo para WildlifeAI sin entrenar ni reemplazar el modelo actual.
+
+Archivos modificados:
+
+- `python/wildlife_classes.yaml`
+- `python/prepare_dataset.py`
+- `README.md`
+
+Estado: preparacion funcional. `wildlife_classes.yaml` define jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma. `prepare_dataset.py` valida datasets reales en `datasets_raw` antes de generar `python/dataset/data.yaml`. No se entreno el modelo, no se borro `python/best.pt` y no se elimino el dataset actual de leopard.

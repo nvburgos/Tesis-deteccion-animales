@@ -36,6 +36,11 @@ button {
   font: inherit;
 }
 
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 h1,
 h2,
 p {
@@ -262,7 +267,7 @@ p {
 .metricsGrid {
   display: grid;
   gap: 24px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .analysisGrid {
@@ -480,7 +485,99 @@ p {
 .resultGrid {
   display: grid;
   gap: 14px;
-  margin-top: 28px;
+  margin-top: 18px;
+}
+
+.detectionImageFrame {
+  background: #0d1d14;
+  border: 1px solid #d8e2dc;
+  border-radius: 14px;
+  display: inline-block;
+  margin-top: 24px;
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.detectionImage {
+  display: block;
+  height: auto;
+  max-height: 380px;
+  max-width: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.detectionBox {
+  border: 3px solid #b7e4c7;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(1, 45, 29, 0.55),
+    0 10px 28px rgba(0, 0, 0, 0.25);
+  position: absolute;
+}
+
+.detectionBoxLabel,
+.detectionBoxConfidence {
+  background: var(--primary);
+  border-radius: 999px;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  left: 8px;
+  line-height: 1;
+  padding: 7px 10px;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.detectionBoxLabel {
+  top: 8px;
+}
+
+.detectionBoxConfidence {
+  bottom: 8px;
+}
+
+.noDetectionOverlay {
+  align-items: center;
+  background: rgba(1, 45, 29, 0.72);
+  color: white;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: absolute;
+  text-align: center;
+}
+
+.noDetectionOverlay strong {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  color: var(--primary);
+  font-size: 14px;
+  padding: 10px 16px;
+}
+
+.detectionImageEmpty {
+  align-items: center;
+  background: #f6f8f7;
+  border: 1px dashed var(--outline-strong);
+  border-radius: 14px;
+  color: #4f5a55;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 24px;
+  min-height: 160px;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.detectionImageEmpty strong {
+  color: var(--primary);
+  font-size: 18px;
 }
 
 .resultGrid div {
@@ -535,6 +632,84 @@ p {
   box-shadow: var(--shadow-card);
   margin-top: 24px;
   overflow: hidden;
+}
+
+.filterPanel,
+.statsPanel {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.filterPanel {
+  align-items: end;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) auto;
+  margin-bottom: 24px;
+  padding: 22px 24px;
+}
+
+.filterPanel label {
+  display: grid;
+  gap: 8px;
+}
+
+.filterPanel label span {
+  color: #29312e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.filterPanel select,
+.filterPanel input {
+  background: white;
+  border: 1px solid var(--outline-strong);
+  border-radius: 999px;
+  color: var(--text);
+  font: inherit;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.statsPanel {
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.speciesStatsList {
+  display: grid;
+  gap: 0;
+  padding: 0 24px 24px;
+}
+
+.speciesStatRow {
+  align-items: center;
+  border-top: 1px solid #e1e7e3;
+  display: flex;
+  justify-content: space-between;
+  min-height: 58px;
+}
+
+.speciesStatRow span {
+  color: #252b29;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.speciesStatRow strong {
+  align-items: center;
+  background: var(--success);
+  border-radius: 999px;
+  color: var(--primary-container);
+  display: inline-flex;
+  font-size: 13px;
+  min-width: 38px;
+  justify-content: center;
+  padding: 8px 12px;
 }
 
 .panelHeader {
@@ -763,7 +938,9 @@ td {
   display: block;
   font-size: 15px;
   font-weight: 800;
+  line-height: 58px;
   min-height: 58px;
+  text-align: center;
   width: 100%;
 }
 
@@ -844,7 +1021,7 @@ td {
   }
 
   .metricsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .analysisGrid {
@@ -878,6 +1055,15 @@ td {
 
   .metricCard {
     min-height: 0;
+  }
+
+  .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .filterPanel {
+    grid-template-columns: 1fr;
+    padding: 18px 16px;
   }
 
   .dropZone {

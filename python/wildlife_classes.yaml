@@ -1,11 +1,6 @@
 names:
-  0: leopard
-  1: boar
-  2: cheetah
-  3: elephant
-  4: nv cheetah
-  5: nv deer
-  6: nv elephant
-  7: nv lion
-  8: deer
-  9: lion
+  0: jaguar
+  1: tapir_amazonico
+  2: venado_cola_blanca
+  3: ocelote
+  4: puma

@@ -92,6 +92,7 @@ export async function POST(request: Request) {
         imagePath: publicPath,
         location,
         priority: calculatePriority(prediction.species, prediction.confidence),
+        coordinates: null,
         warning: prediction.warning
       },
       { status: 422 }
