@@ -265,6 +265,13 @@ p {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.analysisGrid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  margin-top: 24px;
+}
+
 .metricCard {
   background: var(--surface);
   border: 1px solid var(--outline);
@@ -318,6 +325,207 @@ p {
   font-size: 13px;
   line-height: 1.45;
   margin-top: 8px;
+}
+
+.uploadPanel,
+.resultCard {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.uploadHeader {
+  align-items: flex-start;
+  min-height: 82px;
+}
+
+.uploadHeader p,
+.resultHeading p {
+  color: #4f5a55;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.dropZone {
+  align-items: center;
+  background: #f7f9f8;
+  border: 1px dashed var(--outline-strong);
+  border-radius: 14px;
+  display: flex;
+  justify-content: center;
+  margin: 0 24px;
+  min-height: 330px;
+  overflow: hidden;
+  padding: 18px;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.dropZone:hover,
+.dropZone:focus-visible {
+  background: #eef4f0;
+  border-color: var(--primary-muted);
+  outline: 0;
+}
+
+.dropZone.hasPreview {
+  align-items: stretch;
+  background: #e3ebe6;
+  padding: 0;
+}
+
+.dropZoneEmpty {
+  align-items: center;
+  color: #4a5550;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.dropZoneEmpty strong {
+  color: var(--primary);
+  font-size: 18px;
+}
+
+.dropZoneEmpty span:last-child {
+  font-size: 14px;
+}
+
+.dropZoneIcon {
+  align-items: center;
+  background: #dfe8e2;
+  border-radius: 999px;
+  color: var(--primary-container);
+  display: inline-flex;
+  height: 62px;
+  justify-content: center;
+  margin-bottom: 8px;
+  width: 62px;
+}
+
+.previewImage {
+  display: block;
+  height: 100%;
+  max-height: 430px;
+  object-fit: contain;
+  width: 100%;
+}
+
+.uploadFooter {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 22px 24px 24px;
+}
+
+.selectedFile {
+  color: #4a5550;
+  font-size: 14px;
+  font-weight: 650;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spinIcon {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.resultCard {
+  padding: 24px;
+}
+
+.resultHeading {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+}
+
+.resultHeading h2 {
+  color: var(--primary);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.resultIcon {
+  align-items: center;
+  background: #e5e9e6;
+  border-radius: 12px;
+  color: #5a625f;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.resultSuccess {
+  background: var(--success);
+  color: var(--primary-container);
+}
+
+.resultGrid {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.resultGrid div {
+  background: #f6f8f7;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.resultGrid span {
+  color: #59645f;
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.resultGrid strong {
+  color: var(--primary);
+  display: block;
+  font-size: 24px;
+  line-height: 1.2;
+  margin-top: 8px;
+}
+
+.emptyResult,
+.resultMessage {
+  align-items: center;
+  background: #f6f8f7;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  color: #4f5a55;
+  display: flex;
+  gap: 10px;
+  line-height: 1.45;
+  margin-top: 24px;
+  padding: 16px;
+}
+
+.resultMessage {
+  background: #fbf6e6;
+  border-color: #f0dfaa;
+  color: #6e4600;
+  font-size: 14px;
 }
 
 .detectionsPanel {
@@ -527,6 +735,11 @@ td {
   color: #5a625f;
 }
 
+.priorityReview {
+  background: #fbf6e6;
+  color: #6e4600;
+}
+
 .confidenceCell {
   text-align: center;
 }
@@ -633,6 +846,10 @@ td {
   .metricsGrid {
     grid-template-columns: 1fr;
   }
+
+  .analysisGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -661,6 +878,21 @@ td {
 
   .metricCard {
     min-height: 0;
+  }
+
+  .dropZone {
+    margin: 0 16px;
+    min-height: 260px;
+  }
+
+  .uploadFooter {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px 16px 20px;
+  }
+
+  .uploadFooter .primaryButton {
+    width: 100%;
   }
 
   .panelHeader {

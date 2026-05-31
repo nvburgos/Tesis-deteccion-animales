@@ -1,0 +1,18 @@
+
+> wildlife-ai-ui@1.0.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.100.16:3000
+- Environments: .env
+✓ Ready in 1032ms
+Creating turbopack project {
+  dir: 'C:\\Users\\Administrador\\Downloads\\wildlife-ai-ui\\wildlife-ai-ui',
+  testMode: true
+}
+
+ GET / 200 in 2.8s (next.js: 2.4s, application-code: 405ms)
+ GET / 200 in 146ms (next.js: 21ms, application-code: 125ms)
+ POST /predict 404 in 1145ms (next.js: 532ms, application-code: 612ms)
+ POST /predict 404 in 520ms (next.js: 16ms, application-code: 503ms)

@@ -11,6 +11,8 @@ venv/
 __pycache__/
 *.pyc
 python/dataset/
+python/datasets_raw/*
+!python/datasets_raw/README.md
 python/runs/
 python/best.pt
 *.pt

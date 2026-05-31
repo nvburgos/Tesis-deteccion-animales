@@ -3,23 +3,15 @@ import os
 import sys
 
 
-SUPPORTED_SPECIES = {
-    "jaguar": "Jaguar",
+DISPLAY_SPECIES = {
     "leopard": "Leopard",
-    "tapir": "Tapir Amazonico",
-    "tapir amazonico": "Tapir Amazonico",
-    "venado": "Venado Cola Blanca",
-    "venado cola blanca": "Venado Cola Blanca",
-    "white tailed deer": "Venado Cola Blanca",
+    "boar": "Jabali",
+    "cheetah": "Chita",
+    "elephant": "Elefante",
+    "lion": "Leon",
+    "deer": "Venado",
 }
 
-SPECIES_BY_HINT = {
-    "jaguar": ("Jaguar", 96.0, [112, 84, 420, 360]),
-    "leopard": ("Leopard", 96.0, [112, 84, 420, 360]),
-    "tapir": ("Tapir Amazonico", 89.0, [96, 78, 390, 332]),
-    "venado": ("Venado Cola Blanca", 92.0, [140, 92, 410, 340]),
-    "deer": ("Venado Cola Blanca", 92.0, [140, 92, 410, 340]),
-}
 
 
 def fallback_prediction(image_path):
@@ -47,17 +39,26 @@ def normalize_label(label):
     return label.replace("_", " ").replace("-", " ").strip().lower()
 
 
-def to_supported_species(label):
+def to_display_species(label):
     normalized = normalize_label(label)
 
-    if normalized in SUPPORTED_SPECIES:
-        return SUPPORTED_SPECIES[normalized]
+    if normalized in DISPLAY_SPECIES:
+        return DISPLAY_SPECIES[normalized]
 
-    for hint, species in SUPPORTED_SPECIES.items():
+    for hint, species in DISPLAY_SPECIES.items():
         if hint in normalized:
             return species
 
-    return None
+    return normalized.title()
+
+
+def is_configured_species(label):
+    normalized = normalize_label(label)
+
+    if normalized in DISPLAY_SPECIES:
+        return True
+
+    return any(hint in normalized for hint in DISPLAY_SPECIES)
 
 
 def get_model_path():
@@ -74,8 +75,9 @@ def predict_with_yolo(image_path):
 
     model_path = get_model_path()
     allow_base_model = os.environ.get("ALLOW_BASE_MODEL", "false").lower() == "true"
+    using_custom_model = os.path.exists(model_path)
 
-    if not os.path.exists(model_path):
+    if not using_custom_model:
         if not allow_base_model:
             return {
                 "species": "Modelo no configurado",
@@ -104,11 +106,11 @@ def predict_with_yolo(image_path):
     best_index = int(boxes.conf.argmax().item())
     class_id = int(boxes.cls[best_index].item())
     raw_label = results[0].names[class_id]
-    species = to_supported_species(raw_label)
+    species = to_display_species(raw_label)
     confidence = round(float(boxes.conf[best_index].item()) * 100, 2)
     coordinates = [round(float(value), 2) for value in boxes.xyxy[best_index].tolist()]
 
-    if not species:
+    if not using_custom_model and not is_configured_species(raw_label):
         return {
             "species": "Sin deteccion",
             "confidence": 0,

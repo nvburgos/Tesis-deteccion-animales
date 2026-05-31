@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "prepare:dataset": ".venv\\Scripts\\python.exe python\\prepare_dataset.py",
     "train:yolo": ".venv\\Scripts\\python.exe python\\train.py",
     "predict:yolo": ".venv\\Scripts\\python.exe python\\predict.py"
   },

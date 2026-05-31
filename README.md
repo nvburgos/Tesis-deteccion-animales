@@ -41,13 +41,15 @@ wildlife-ai-ui/
 |   +-- schema.prisma
 +-- python/
 |   +-- predict.py
+|   +-- prepare_dataset.py
 |   +-- train.py
-|   +-- dataset.yaml
+|   +-- wildlife_classes.yaml
+|   +-- datasets_raw/
 |   +-- dataset/
-|   |   +-- images/train/
-|   |   +-- images/val/
-|   |   +-- labels/train/
-|   |   +-- labels/val/
+|   |   +-- train/images/
+|   |   +-- train/labels/
+|   |   +-- valid/images/
+|   |   +-- valid/labels/
 |   +-- best.pt
 +-- public/
 |   +-- uploads/
@@ -77,27 +79,48 @@ PYTHON_BIN=".venv\\Scripts\\python.exe"
 
 ## Entrenar modelo
 
-Coloca tu dataset etiquetado en formato YOLO:
+El proyecto soporta preparar un dataset multi-clase desde varias exportaciones YOLOv8.
+
+Clases configuradas en `python/wildlife_classes.yaml`:
 
 ```text
-python/dataset/
-+-- images/
-|   +-- train/
-|   +-- val/
-+-- labels/
-    +-- train/
-    +-- val/
+0: jaguar
+1: leopard
+2: tapir amazonico
+3: venado cola blanca
+4: puma
+5: ocelot
+6: oso de anteojos
+7: pecari
+8: capibara
+9: mono
 ```
 
-Las clases deben coincidir con `python/dataset.yaml`:
+Coloca cada dataset exportado desde Roboflow/YOLOv8 dentro de `python/datasets_raw/`:
 
 ```text
-0: Jaguar
-1: Tapir Amazonico
-2: Venado Cola Blanca
+python/datasets_raw/
++-- leopard/
+|   +-- data.yaml
+|   +-- train/images/
+|   +-- train/labels/
+|   +-- valid/images/
+|   +-- valid/labels/
++-- jaguar/
+    +-- data.yaml
+    +-- train/images/
+    +-- train/labels/
+    +-- valid/images/
+    +-- valid/labels/
 ```
 
-Cada imagen debe tener un `.txt` con anotaciones YOLO en la carpeta `labels` correspondiente.
+Luego genera el dataset final:
+
+```bash
+npm run prepare:dataset
+```
+
+Ese comando crea `python/dataset/data.yaml` y remapea los IDs de clase al catalogo comun. Cada imagen debe tener su `.txt` con anotaciones YOLO en la carpeta `labels` correspondiente.
 
 Entrena:
 

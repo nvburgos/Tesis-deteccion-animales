@@ -48,7 +48,7 @@ def main():
     model = YOLO("yolov8n.pt")
     results = model.train(
         data=str(DATASET_YAML),
-        epochs=50,
+        epochs=5,
         imgsz=640,
         batch=8,
         project=str(ROOT / "runs"),
