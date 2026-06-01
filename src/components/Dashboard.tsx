@@ -5,9 +5,10 @@ import DetectionResult from './DetectionResult'
 import Header from './Header'
 import RecentDetections from './RecentDetections'
 import Sidebar from './Sidebar'
+import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
 import UploadImage from './UploadImage'
-import type { DashboardMetric, DetectionResultData, Priority, RecentDetection } from './dashboardTypes'
+import type { DashboardMetric, DashboardView, DetectionResultData, Priority, RecentDetection } from './dashboardTypes'
 
 type DashboardData = {
   metrics: DashboardMetric[]
@@ -17,6 +18,25 @@ type DashboardData = {
 type BackendAnalyzeResponse = Partial<DetectionResultData> & {
   error?: string
   warning?: string
+}
+
+type DashboardProps = {
+  userName: string
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') ?? ''
+
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T
+  }
+
+  const text = await response.text()
+  const message = text.includes('<!DOCTYPE')
+    ? 'El servidor devolvio una pagina HTML en lugar de JSON. Revisa que el endpoint /api/analyze este activo.'
+    : text || 'El servidor devolvio una respuesta invalida.'
+
+  throw new Error(message)
 }
 
 function toPercent(confidence: number) {
@@ -42,13 +62,15 @@ function normalizePriority(priority?: string, species?: string | null, confidenc
 function normalizeResult(result: BackendAnalyzeResponse): DetectionResultData {
   const species = result.species ?? null
   const confidence = toPercent(Number(result.confidence ?? 0))
+  const hasBackendMessage = typeof result.message === 'string' && result.message.trim().length > 0
 
   return {
     species,
     confidence,
     priority: normalizePriority(result.priority, species, confidence),
+    coordinates: result.coordinates,
     message:
-      result.message ??
+      (hasBackendMessage ? result.message : undefined) ??
       result.error ??
       (species === 'Sin deteccion' || !species ? 'No se detecto ningun animal en la imagen.' : undefined),
     imagePath: result.imagePath,
@@ -77,7 +99,7 @@ async function analyzeImage(file: File): Promise<DetectionResultData> {
     method: 'POST'
   })
 
-  const data = (await response.json()) as BackendAnalyzeResponse
+  const data = await readJsonResponse<BackendAnalyzeResponse>(response)
   console.log('Respuesta backend:', data)
 
   if (!response.ok && !data.species) {
@@ -94,7 +116,7 @@ async function loadDetections(): Promise<DashboardData> {
     throw new Error('No se pudieron cargar las detecciones')
   }
 
-  const data = (await response.json()) as DashboardData
+  const data = await readJsonResponse<DashboardData>(response)
 
   return {
     metrics: data.metrics,
@@ -102,7 +124,8 @@ async function loadDetections(): Promise<DashboardData> {
   }
 }
 
-export default function Dashboard() {
+export default function Dashboard({ userName }: DashboardProps) {
+  const [activeView, setActiveView] = useState<DashboardView>('dashboard')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState('')
   const [result, setResult] = useState<DetectionResultData | null>(null)
@@ -177,27 +200,33 @@ export default function Dashboard() {
 
   return (
     <main className="dashboardShell">
-      <Sidebar />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <section className="dashboardMain">
-        <Header />
+        <Header userName={userName} />
 
         <div className="contentArea">
           {error ? <div className="statusBanner">{error}</div> : null}
 
-          <StatsCards metrics={metrics} />
+          {activeView === 'species' ? (
+            <SpeciesGallery detections={detections} />
+          ) : (
+            <>
+              <StatsCards metrics={metrics} />
 
-          <section className="analysisGrid">
-            <UploadImage
-              fileName={selectedFile?.name ?? ''}
-              imagePreview={imagePreview}
-              isAnalyzing={isAnalyzing}
-              onAnalyze={handleAnalyze}
-              onFileSelected={handleFileSelected}
-            />
-            <DetectionResult result={result} />
-          </section>
+              <section className="analysisGrid">
+                <UploadImage
+                  fileName={selectedFile?.name ?? ''}
+                  imagePreview={imagePreview}
+                  isAnalyzing={isAnalyzing}
+                  onAnalyze={handleAnalyze}
+                  onFileSelected={handleFileSelected}
+                />
+                <DetectionResult result={result} />
+              </section>
 
-          <RecentDetections detections={detections} />
+              <RecentDetections detections={detections} />
+            </>
+          )}
         </div>
       </section>
     </main>

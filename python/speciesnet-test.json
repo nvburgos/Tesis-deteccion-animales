@@ -1,0 +1,52 @@
+{
+ "predictions": [
+  {
+   "filepath": "C:\\Users\\rfrei\\OneDrive\\Escritorio\\mi\\Tesis-deteccion-animales\\public\\uploads\\1780329430949-65e211c8c7570091babd1128-tigrillo---cr-ditos--proyecto-cerrejon---d-as-de-c-mara-trampa.jpg",
+   "country": "ECU",
+   "classifications": {
+    "classes": [
+     "22976d14-d424-4f18-a67a-d8e1689cefcc;mammalia;carnivora;felidae;leopardus;pardalis;ocelot",
+     "442208b3-d712-412e-bfd3-430688698aa0;mammalia;carnivora;felidae;leopardus;wiedii;margay",
+     "6f5cfe6e-4d2f-4a39-b7eb-cffe6aef7de1;mammalia;carnivora;felidae;prionailurus;bengalensis;leopard cat",
+     "05afbf7e-f878-4534-b08f-c97a02435474;mammalia;carnivora;felidae;leopardus;;leopardus species",
+     "573c85b2-4dac-406f-bcd2-ab2448fd234c;mammalia;carnivora;felidae;leptailurus;serval;serval"
+    ],
+    "scores": [
+     0.7548,
+     0.1531,
+     0.0404,
+     0.013,
+     0.0091
+    ]
+   },
+   "detections": [
+    {
+     "category": "1",
+     "label": "animal",
+     "conf": 0.9006,
+     "bbox": [
+      0.2595,
+      0.4132,
+      0.1532,
+      0.5342
+     ]
+    },
+    {
+     "category": "1",
+     "label": "animal",
+     "conf": 0.7616,
+     "bbox": [
+      0.2179,
+      0.6877,
+      0.1263,
+      0.2776
+     ]
+    }
+   ],
+   "prediction": "22976d14-d424-4f18-a67a-d8e1689cefcc;mammalia;carnivora;felidae;leopardus;pardalis;ocelot",
+   "prediction_score": 0.7548,
+   "prediction_source": "classifier",
+   "model_version": "4.0.2a"
+  }
+ ]
+}

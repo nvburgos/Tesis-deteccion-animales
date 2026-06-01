@@ -23,6 +23,22 @@ export async function ensureDatabase() {
     );
   `)
 
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "User" (
+      "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "name" TEXT NOT NULL,
+      "email" TEXT NOT NULL,
+      "passwordHash" TEXT NOT NULL,
+      "institution" TEXT,
+      "role" TEXT NOT NULL DEFAULT 'Investigador',
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
+  `)
+
   initialized = true
 }
 
