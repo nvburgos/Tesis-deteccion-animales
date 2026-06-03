@@ -1,9 +1,26 @@
 'use client'
 
 import Link from 'next/link'
-import type { Priority, RecentDetection } from './dashboardTypes'
+import { getSpeciesLabel, uiText, type UiText } from '@/lib/i18n'
+import type { Language, Priority, RecentDetection } from './dashboardTypes'
 
-function PriorityBadge({ priority }: { priority: Priority }) {
+function getPriorityLabel(priority: Priority, language: Language) {
+  if (language === 'es') {
+    return priority
+  }
+
+  if (priority === 'Alta prioridad') {
+    return 'High priority'
+  }
+
+  if (priority === 'Revision manual') {
+    return 'Manual review'
+  }
+
+  return 'Normal'
+}
+
+function PriorityBadge({ language, priority }: { language: Language; priority: Priority }) {
   const className =
     priority === 'Alta prioridad'
       ? 'priorityPill priorityHigh'
@@ -11,7 +28,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
         ? 'priorityPill priorityReview'
         : 'priorityPill priorityNormal'
 
-  return <span className={className}>{priority}</span>
+  return <span className={className}>{getPriorityLabel(priority, language)}</span>
 }
 
 function formatConfidence(confidence: number) {
@@ -19,17 +36,25 @@ function formatConfidence(confidence: number) {
   return `${Math.round(percent)}%`
 }
 
-export default function RecentDetections({ detections }: { detections: RecentDetection[] }) {
+export default function RecentDetections({
+  detections,
+  language = 'es',
+  text = uiText[language]
+}: {
+  detections: RecentDetection[]
+  language?: Language
+  text?: UiText
+}) {
   return (
-    <section className="detectionsPanel" aria-label="Detecciones recientes">
+    <section className="detectionsPanel" aria-label={text.recentDetections}>
       <div className="panelHeader">
-        <h2>Detecciones recientes</h2>
+        <h2>{text.recentDetections}</h2>
         <div className="panelActions">
           <button className="secondaryButton" type="button">
-            Filtrar
+            {text.filter}
           </button>
           <button className="secondaryButton" type="button">
-            Exportar
+            {text.export}
           </button>
         </div>
       </div>
@@ -38,51 +63,55 @@ export default function RecentDetections({ detections }: { detections: RecentDet
         <table>
           <thead>
             <tr>
-              <th>Imagen</th>
-              <th>Especie detectada</th>
-              <th>Camara o ubicacion</th>
-              <th>Prioridad</th>
-              <th>Fecha/hora</th>
-              <th>Confianza</th>
+              <th>{text.image}</th>
+              <th>{text.speciesDetected}</th>
+              <th>{text.cameraLocation}</th>
+              <th>{text.priority}</th>
+              <th>{language === 'es' ? 'Fecha/hora' : 'Date/time'}</th>
+              <th>{text.confidence}</th>
             </tr>
           </thead>
           <tbody>
             {detections.length > 0 ? (
-              detections.map((detection) => (
-                <tr key={detection.id}>
-                  <td>
-                    {detection.imagePath ? (
-                      <img
-                        alt={`Imagen analizada: ${detection.species}`}
-                        className="wildlifeImage"
-                        src={detection.imagePath}
-                      />
-                    ) : (
-                      <span className="wildlifeThumb" aria-hidden="true" />
-                    )}
-                  </td>
-                  <td className="speciesCell">{detection.species}</td>
-                  <td>{detection.location}</td>
-                  <td>
-                    <PriorityBadge priority={detection.priority} />
-                  </td>
-                  <td>
-                    <time dateTime={detection.createdAt}>
-                      {new Date(detection.createdAt).toLocaleString('es-ES', {
-                        dateStyle: 'short',
-                        timeStyle: 'short'
-                      })}
-                    </time>
-                  </td>
-                  <td className="confidenceCell">
-                    <span>{formatConfidence(detection.confidence)}</span>
-                  </td>
-                </tr>
-              ))
+              detections.map((detection) => {
+                const speciesLabel = getSpeciesLabel(detection.species, language)
+
+                return (
+                  <tr key={detection.id}>
+                    <td>
+                      {detection.imagePath ? (
+                        <img
+                          alt={`${text.image}: ${speciesLabel}`}
+                          className="wildlifeImage"
+                          src={detection.imagePath}
+                        />
+                      ) : (
+                        <span className="wildlifeThumb" aria-hidden="true" />
+                      )}
+                    </td>
+                    <td className="speciesCell">{speciesLabel}</td>
+                    <td>{detection.location}</td>
+                    <td>
+                      <PriorityBadge language={language} priority={detection.priority} />
+                    </td>
+                    <td>
+                      <time dateTime={detection.createdAt}>
+                        {new Date(detection.createdAt).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {
+                          dateStyle: 'short',
+                          timeStyle: 'short'
+                        })}
+                      </time>
+                    </td>
+                    <td className="confidenceCell">
+                      <span>{formatConfidence(detection.confidence)}</span>
+                    </td>
+                  </tr>
+                )
+              })
             ) : (
               <tr>
                 <td className="emptyState" colSpan={6}>
-                  Aun no hay detecciones. Carga una imagen de camara trampa para iniciar el analisis.
+                  {text.emptyDetections}
                 </td>
               </tr>
             )}
@@ -91,7 +120,7 @@ export default function RecentDetections({ detections }: { detections: RecentDet
       </div>
 
       <Link className="historyButton" href="/historial">
-        Ver todas las detecciones historicas
+        {text.history}
       </Link>
     </section>
   )

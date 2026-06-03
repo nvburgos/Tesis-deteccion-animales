@@ -189,6 +189,33 @@ p {
   gap: 16px;
 }
 
+.languageToggle {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.languageOption {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: #26302b;
+  font-size: 13px;
+  font-weight: 800;
+  height: 34px;
+  min-width: 42px;
+  padding: 0 10px;
+}
+
+.languageOption.active {
+  background: var(--primary);
+  color: white;
+}
+
 .iconButton {
   align-items: center;
   background: transparent;

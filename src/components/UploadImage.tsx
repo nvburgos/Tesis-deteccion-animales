@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, useRef } from 'react'
 import { ImagePlus, Loader2, UploadCloud } from 'lucide-react'
+import type { UiText } from '@/lib/i18n'
 
 type UploadImageProps = {
   fileName: string
@@ -9,6 +10,7 @@ type UploadImageProps = {
   isAnalyzing: boolean
   onAnalyze: () => void
   onFileSelected: (file: File) => void
+  text: UiText
 }
 
 export default function UploadImage({
@@ -16,7 +18,8 @@ export default function UploadImage({
   imagePreview,
   isAnalyzing,
   onAnalyze,
-  onFileSelected
+  onFileSelected,
+  text
 }: UploadImageProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -38,11 +41,11 @@ export default function UploadImage({
   }
 
   return (
-    <section className="uploadPanel" aria-label="Carga de imagen de cámara trampa">
+    <section className="uploadPanel" aria-label={text.uploadPanel}>
       <div className="panelHeader uploadHeader">
         <div>
-          <h2>Cargar imagen de cámara trampa</h2>
-          <p>Sube una fotografía para que el modelo estime la especie y prioridad.</p>
+          <h2>{text.uploadImage}</h2>
+          <p>{text.uploadHint}</p>
         </div>
       </div>
 
@@ -68,23 +71,23 @@ export default function UploadImage({
         />
 
         {imagePreview ? (
-          <img alt="Vista previa de cámara trampa" className="previewImage" src={imagePreview} />
+          <img alt={text.selectedFileAlt} className="previewImage" src={imagePreview} />
         ) : (
           <div className="dropZoneEmpty">
             <span className="dropZoneIcon">
               <ImagePlus size={30} />
             </span>
-            <strong>Arrastra una imagen aquí</strong>
-            <span>o haz clic para seleccionar un archivo JPG o PNG</span>
+            <strong>{text.uploadPrompt}</strong>
+            <span>{text.uploadSubprompt}</span>
           </div>
         )}
       </div>
 
       <div className="uploadFooter">
-        <span className="selectedFile">{fileName || 'Ninguna imagen seleccionada'}</span>
+        <span className="selectedFile">{fileName || text.noImageSelected}</span>
         <button className="primaryButton" disabled={!imagePreview || isAnalyzing} onClick={onAnalyze} type="button">
           {isAnalyzing ? <Loader2 className="spinIcon" size={18} /> : <UploadCloud size={18} />}
-          {isAnalyzing ? 'Procesando...' : 'Analizar imagen'}
+          {isAnalyzing ? text.analyzing : text.analyzeImage}
         </button>
       </div>
     </section>

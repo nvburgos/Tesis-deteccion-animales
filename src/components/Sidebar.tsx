@@ -3,14 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { FileText, Grid2X2, Headphones, Map, PawPrint, Sprout } from 'lucide-react'
+import { uiText, type UiText } from '@/lib/i18n'
 import type { DashboardView } from './dashboardTypes'
 
-const navItems: { label: string; icon: typeof Grid2X2; view: DashboardView }[] = [
-  { label: 'Panel de Control', icon: Grid2X2, view: 'dashboard' },
-  { label: 'Mapa de Campo', icon: Map, view: 'map' },
-  { label: 'Especies', icon: PawPrint, view: 'species' },
-  { label: 'Reportes', icon: FileText, view: 'reports' },
-  { label: 'Soporte', icon: Headphones, view: 'support' }
+const navItems: { labelKey: keyof UiText; icon: typeof Grid2X2; view: DashboardView }[] = [
+  { labelKey: 'dashboard', icon: Grid2X2, view: 'dashboard' },
+  { labelKey: 'fieldMap', icon: Map, view: 'map' },
+  { labelKey: 'species', icon: PawPrint, view: 'species' },
+  { labelKey: 'reports', icon: FileText, view: 'reports' },
+  { labelKey: 'support', icon: Headphones, view: 'support' }
 ]
 
 const routeItems = [
@@ -22,9 +23,10 @@ const routeItems = [
 type SidebarProps = {
   activeView?: DashboardView
   onViewChange?: (view: DashboardView) => void
+  text?: UiText
 }
 
-export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
+export default function Sidebar({ activeView, onViewChange, text = uiText.es }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -39,17 +41,18 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
           ? navItems.map((item) => {
               const Icon = item.icon
               const isActive = item.view === activeView
+              const label = text[item.labelKey]
 
               return (
                 <button
                   aria-current={isActive ? 'page' : undefined}
                   className={isActive ? 'navItem active' : 'navItem'}
-                  key={item.label}
+                  key={item.view}
                   onClick={() => onViewChange(item.view)}
                   type="button"
                 >
                   <Icon size={22} />
-                  <span>{item.label}</span>
+                  <span>{label}</span>
                 </button>
               )
             })
@@ -69,8 +72,8 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
       <div className="researcherCard">
         <span className="researcherAvatar" aria-hidden="true" />
         <div>
-          <strong>Investigador WildlifeAI</strong>
-          <span>Monitoreo con IA</span>
+          <strong>{text.researcher}</strong>
+          <span>{text.wildlifeMonitoring}</span>
         </div>
       </div>
     </aside>

@@ -1,3 +1,5 @@
+import type { Language } from '@/lib/i18n'
+
 export type Priority = 'Normal' | 'Alta prioridad' | 'Revision manual'
 
 export type DetectionResultData = {
@@ -33,3 +35,5 @@ export type DashboardMetric = {
 }
 
 export type DashboardView = 'dashboard' | 'map' | 'species' | 'reports' | 'support'
+
+export type { Language }

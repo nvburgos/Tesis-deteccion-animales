@@ -16,6 +16,8 @@ El proyecto tiene una interfaz web funcional en Next.js con React y TypeScript. 
 - Muestra la imagen analizada con caja de deteccion cuando el backend devuelve coordenadas.
 - Incluye pagina de historial con filtros por especie y fecha.
 - Incluye pagina de estadisticas con metricas principales.
+- Permite cambiar el idioma visible de la UI entre espanol e ingles con un selector `ES/EN`.
+- Traduce nombres comunes de especies en la interfaz sin modificar el valor original guardado en la base de datos.
 - Mantiene tarjetas superiores de metricas.
 - Mantiene una tabla de detecciones recientes.
 - Envia la imagen real al endpoint interno `POST /api/analyze`.
@@ -135,12 +137,14 @@ wildlife-ai-ui/
 |   |   +-- Header.tsx
 |   |   +-- RecentDetections.tsx
 |   |   +-- Sidebar.tsx
+|   |   +-- SpeciesGallery.tsx
 |   |   +-- StatsCards.tsx
 |   |   +-- UploadImage.tsx
 |   |   +-- dashboardTypes.ts
 |   +-- lib/
 |       +-- database.ts
 |       +-- detections.ts
+|       +-- i18n.ts
 |       +-- prisma.ts
 +-- package.json
 +-- tsconfig.json
@@ -184,15 +188,16 @@ wildlife-ai-ui/
 
 | Archivo | Descripcion |
 | --- | --- |
-| `src/components/Dashboard.tsx` | Componente orquestador. Maneja estado de archivo seleccionado, preview, analisis, resultado, metricas y detecciones recientes. |
+| `src/components/Dashboard.tsx` | Componente orquestador. Maneja estado de archivo seleccionado, preview, analisis, resultado, metricas, detecciones recientes e idioma activo. |
 | `src/components/Sidebar.tsx` | Menu lateral con navegacion y marca WildlifeAI. |
-| `src/components/Header.tsx` | Encabezado principal con titulo de tesis y acciones visuales. |
+| `src/components/Header.tsx` | Encabezado principal con acciones visuales y selector de idioma `ES/EN`. |
 | `src/components/StatsCards.tsx` | Tarjetas superiores: imagenes analizadas, especies detectadas y confianza promedio. |
 | `src/components/UploadImage.tsx` | Area drag and drop, input file, vista previa y boton `Analizar imagen`. |
 | `src/components/DetectionImage.tsx` | Visor de imagen analizada con bounding box, etiqueta de especie, confianza y mensaje visual cuando no hay deteccion. |
-| `src/components/DetectionResult.tsx` | Tarjeta que muestra especie detectada, confianza, prioridad o mensaje de no deteccion. |
-| `src/components/RecentDetections.tsx` | Tabla de detecciones recientes con imagen, especie, ubicacion, prioridad, fecha/hora y confianza. |
-| `src/components/dashboardTypes.ts` | Tipos TypeScript compartidos: prioridad, resultado, deteccion reciente y metricas. |
+| `src/components/DetectionResult.tsx` | Tarjeta que muestra especie detectada, confianza, prioridad, mensaje de no deteccion y caja visual de deteccion cuando hay coordenadas. Traduce especie y prioridad segun el idioma activo. |
+| `src/components/RecentDetections.tsx` | Tabla de detecciones recientes con imagen, especie traducida, ubicacion, prioridad, fecha/hora y confianza. |
+| `src/components/SpeciesGallery.tsx` | Vista de galeria por especie detectada. Agrupa por el nombre original guardado y muestra la etiqueta traducida segun idioma. |
+| `src/components/dashboardTypes.ts` | Tipos TypeScript compartidos: prioridad, resultado, deteccion reciente, metricas, vistas del dashboard e idioma. |
 
 ### Librerias internas
 
@@ -201,6 +206,7 @@ wildlife-ai-ui/
 | `src/lib/prisma.ts` | Crea y reutiliza el cliente Prisma. Evita multiples instancias en desarrollo. |
 | `src/lib/database.ts` | Crea la tabla `Detection` si no existe y carga datos iniciales de ejemplo si la base esta vacia. |
 | `src/lib/detections.ts` | Normaliza nombres de especies, calcula prioridad y formatea fechas relativas. |
+| `src/lib/i18n.ts` | Diccionario interno de UI `es/en`, tipo `Language` y traducciones de nombres comunes de especies para presentacion. |
 
 ### Prisma y base de datos
 
@@ -356,14 +362,16 @@ No se recomienda usar versiones alpha o beta de Python porque `torch` y `ultraly
 ### Flujo de interfaz
 
 1. El usuario entra al dashboard.
-2. Selecciona o arrastra una imagen.
-3. El navegador genera una vista previa local.
-4. El usuario presiona **Analizar imagen**.
-5. El frontend envia la imagen a `POST /api/analyze`.
-6. El backend guarda la imagen, ejecuta `python/predict.py` y devuelve la prediccion real.
-7. Se muestra la tarjeta de resultado.
-8. La tabla se recarga desde `GET /api/detections`.
-9. Las metricas superiores se recalculan con las detecciones reales cargadas.
+2. Puede cambiar el idioma visible de la UI con el selector `ES/EN`.
+3. Selecciona o arrastra una imagen.
+4. El navegador genera una vista previa local.
+5. El usuario presiona **Analizar imagen**.
+6. El frontend envia la imagen a `POST /api/analyze`.
+7. El backend guarda la imagen, ejecuta `python/predict.py` y devuelve la prediccion real.
+8. Se muestra la tarjeta de resultado.
+9. La tabla se recarga desde `GET /api/detections`.
+10. Las metricas superiores se recalculan con las detecciones reales cargadas.
+11. Los textos de UI, especies, prioridades conocidas y fechas visibles se muestran segun el idioma activo.
 
 ### Flujo interno existente con Next API
 
@@ -409,6 +417,33 @@ Tambien puede responder cuando no detecta animal:
   "priority": "Revision manual",
   "coordinates": null
 }
+```
+
+## Idioma y traduccion de especies
+
+La aplicacion incluye un selector visual `ES/EN` en el encabezado del dashboard.
+
+El idioma activo se guarda en:
+
+```text
+localStorage["wildlifeai-language"]
+```
+
+La traduccion se aplica en la capa de presentacion:
+
+- El backend y la base de datos conservan el valor original de `species`.
+- `src/lib/i18n.ts` contiene el tipo `Language`, los textos de UI para `es` y `en`, y un diccionario de especies comunes.
+- `getSpeciesLabel(species, language)` normaliza nombres con espacios, guiones, guiones bajos y acentos antes de buscar la traduccion.
+- La tabla de detecciones, tarjeta de resultado y galeria muestran la especie traducida segun el idioma activo.
+- La galeria agrupa por el nombre original guardado, no por la traduccion visible, para evitar duplicados al cambiar idioma.
+- Las prioridades conocidas tambien se muestran traducidas visualmente en ingles, pero internamente siguen usando `Normal`, `Alta prioridad` y `Revision manual`.
+
+Ejemplo:
+
+```text
+Valor guardado: Leopard
+UI en espanol: Leopardo
+UI en ingles: Leopard
 ```
 
 ## Entrenamiento YOLO
@@ -473,6 +508,11 @@ python/best.pt
 
 - Interfaz principal del dashboard.
 - Sidebar, header, cards, tabla y estilos responsive.
+- Selector de idioma `ES/EN` en el header.
+- Persistencia del idioma elegido en `localStorage`.
+- Traduccion visual de textos principales de la UI entre espanol e ingles.
+- Traduccion visual de nombres comunes de especies sin alterar el valor original guardado por el modelo.
+- Galeria de especies detectadas con etiquetas traducidas.
 - Carga local de imagen con drag and drop o selector de archivo.
 - Vista previa de imagen.
 - Boton de analisis con estado de carga.
@@ -482,7 +522,8 @@ python/best.pt
 - Pagina `/historial` con filtro por especie y fecha.
 - Pagina `/estadisticas` con total de imagenes, total de detecciones, especies detectadas y confianza promedio.
 - Calculo de metricas de la sesion.
-- Tabla de detecciones recientes en memoria.
+- Tabla de detecciones recientes cargada desde `GET /api/detections`.
+- Caja de deteccion sobre la imagen cuando el backend devuelve coordenadas.
 - Build de Next.js.
 - Typecheck de TypeScript.
 - Endpoints internos `GET /api/detections` y `POST /api/analyze`.
@@ -501,12 +542,6 @@ python/best.pt
 - Entrenar YOLO solo despues de validar el dataset preparado.
 - Conectar el frontend a FastAPI solo cuando exista ese backend.
 - Decidir si se mantiene `POST /api/analyze` o si se reemplaza por FastAPI.
-- Unificar formato de confianza:
-  - Frontend nuevo espera `0.96`.
-  - Endpoint interno actual puede manejar valores como `96`.
-- Unificar prioridades:
-  - Frontend usa `Normal`, `Alta prioridad`, `Revision manual`.
-  - Utilidad interna actual devuelve `Alta` o `Normal`.
 - Persistir tambien los errores de ejecucion YOLO si se desea auditarlos historicamente.
 - Mejorar la visualizacion de cajas cuando existan multiples detecciones en una misma imagen.
 - Agregar seleccion real de camara o ubicacion.
@@ -514,6 +549,7 @@ python/best.pt
 - Agregar manejo de errores visual para imagen invalida, modelo no disponible o backend caido.
 - Ampliar `DISPLAY_SPECIES` solo cuando `best.pt` realmente contenga nuevas clases entrenadas.
 - Actualizar `python/predict.py` despues de entrenar un nuevo `best.pt` con jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma.
+- Ampliar el diccionario `src/lib/i18n.ts` si SpeciesNet o YOLO devuelven nuevas especies que deban mostrarse traducidas.
 - Agregar pruebas automatizadas de componentes y endpoints.
 - Documentar despliegue cuando se defina ambiente final.
 
@@ -540,6 +576,27 @@ Estado: funcional, pendiente o en revision.
 ```
 
 ## Bitacora de cambios
+
+### 2026-06-02
+
+Cambio: Implementacion de selector de idioma `ES/EN` para la UI y traduccion visual de especies, prioridades conocidas y textos principales sin modificar los datos originales guardados por el modelo.
+
+Archivos modificados:
+
+- `src/lib/i18n.ts`
+- `src/components/Dashboard.tsx`
+- `src/components/Header.tsx`
+- `src/components/Sidebar.tsx`
+- `src/components/StatsCards.tsx`
+- `src/components/UploadImage.tsx`
+- `src/components/DetectionResult.tsx`
+- `src/components/RecentDetections.tsx`
+- `src/components/SpeciesGallery.tsx`
+- `src/components/dashboardTypes.ts`
+- `src/app/globals.css`
+- `README.md`
+
+Estado: funcional. El idioma se guarda en `localStorage`, las especies se traducen solo al mostrarse y las validaciones `npm run typecheck` y `npm run build` pasaron correctamente.
 
 ### 2026-05-31
 

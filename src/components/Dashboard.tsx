@@ -8,7 +8,8 @@ import Sidebar from './Sidebar'
 import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
 import UploadImage from './UploadImage'
-import type { DashboardMetric, DashboardView, DetectionResultData, Priority, RecentDetection } from './dashboardTypes'
+import { getSpeciesLabel, uiText } from '@/lib/i18n'
+import type { DashboardMetric, DashboardView, DetectionResultData, Language, Priority, RecentDetection } from './dashboardTypes'
 
 type DashboardData = {
   metrics: DashboardMetric[]
@@ -59,19 +60,47 @@ function normalizePriority(priority?: string, species?: string | null, confidenc
   return 'Normal'
 }
 
-function normalizeResult(result: BackendAnalyzeResponse): DetectionResultData {
+function translateBackendMessage(message: string | undefined, language: Language, species?: string | null) {
+  if (!message) {
+    return undefined
+  }
+
+  if (message.includes('no encontro animales')) {
+    return uiText[language].noAnimalDetected
+  }
+
+  if (message.includes('no asigno una especie concreta')) {
+    return language === 'es'
+      ? 'SpeciesNet detecto un animal, pero no asigno una especie concreta.'
+      : 'SpeciesNet detected an animal, but did not assign a specific species.'
+  }
+
+  if (message.includes('clasificador no identifico una especie configurada')) {
+    return language === 'es'
+      ? 'Se detecto un animal, pero el clasificador no identifico una especie configurada.'
+      : 'An animal was detected, but the classifier did not identify a configured species.'
+  }
+
+  if (message.includes('SpeciesNet identifico la especie como')) {
+    return language === 'es'
+      ? `SpeciesNet identifico la especie como ${getSpeciesLabel(species, language)}.`
+      : `SpeciesNet identified the species as ${getSpeciesLabel(species, language)}.`
+  }
+
+  return message
+}
+
+function normalizeResult(result: BackendAnalyzeResponse, language: Language): DetectionResultData {
   const species = result.species ?? null
   const confidence = toPercent(Number(result.confidence ?? 0))
   const hasBackendMessage = typeof result.message === 'string' && result.message.trim().length > 0
+  const message = hasBackendMessage ? translateBackendMessage(result.message, language, species) : undefined
 
   return {
     species,
     confidence,
     priority: normalizePriority(result.priority, species, confidence),
-    message:
-      (hasBackendMessage ? result.message : undefined) ??
-      result.error ??
-      (species === 'Sin deteccion' || !species ? 'No se detecto ningun animal en la imagen.' : undefined),
+    message: message ?? result.error ?? (species === 'Sin deteccion' || !species ? uiText[language].noAnimalDetected : undefined),
     imagePath: result.imagePath,
     location: result.location,
     createdAt: result.createdAt,
@@ -89,7 +118,7 @@ function normalizeDetection(detection: RecentDetection): RecentDetection {
   }
 }
 
-async function analyzeImage(file: File): Promise<DetectionResultData> {
+async function analyzeImage(file: File, language: Language): Promise<DetectionResultData> {
   const formData = new FormData()
   formData.append('image', file)
   formData.append('location', 'Camara 01 | Zona Norte')
@@ -106,7 +135,7 @@ async function analyzeImage(file: File): Promise<DetectionResultData> {
     throw new Error(data.error ?? 'No se pudo analizar la imagen')
   }
 
-  return normalizeResult(data)
+  return normalizeResult(data, language)
 }
 
 async function loadDetections(): Promise<DashboardData> {
@@ -132,6 +161,34 @@ export default function Dashboard({ userName }: DashboardProps) {
   const [detections, setDetections] = useState<RecentDetection[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState('')
+  const [language, setLanguage] = useState<Language>('es')
+  const text = uiText[language]
+
+  useEffect(() => {
+    const savedLanguage = window.localStorage.getItem('wildlifeai-language')
+
+    if (savedLanguage === 'es' || savedLanguage === 'en') {
+      setLanguage(savedLanguage)
+    }
+  }, [])
+
+  function handleLanguageChange(nextLanguage: Language) {
+    setLanguage(nextLanguage)
+    window.localStorage.setItem('wildlifeai-language', nextLanguage)
+    setResult((currentResult) =>
+      currentResult
+        ? {
+            ...currentResult,
+            message:
+              currentResult.species === 'Sin deteccion' || !currentResult.species
+                ? uiText[nextLanguage].noAnimalDetected
+                : currentResult.message?.includes('SpeciesNet')
+                  ? translateBackendMessage(currentResult.message, nextLanguage, currentResult.species)
+                  : currentResult.message
+          }
+        : currentResult
+    )
+  }
 
   useEffect(() => {
     loadDetections()
@@ -156,27 +213,27 @@ export default function Dashboard({ userName }: DashboardProps) {
 
     return [
       {
-        label: 'Imagenes analizadas',
+        label: text.analyzedImages,
         value: analyzed.toString(),
-        detail: 'Total procesado en esta sesion'
+        detail: text.totalProcessedSession
       },
       {
-        label: 'Total de detecciones',
+        label: language === 'es' ? 'Total de detecciones' : 'Total detections',
         value: totalDetections.toString(),
-        detail: 'Imagenes con animal detectado'
+        detail: language === 'es' ? 'Imagenes con animal detectado' : 'Images with animal detected'
       },
       {
-        label: 'Especies detectadas',
+        label: text.detectedSpecies,
         value: detectedSpecies.toString(),
-        detail: 'Conteo de especies distintas'
+        detail: text.countDistinctSpecies
       },
       {
-        label: 'Confianza promedio',
+        label: text.averageConfidence,
         value: `${averageConfidence}%`,
-        detail: 'Promedio temporal del modelo'
+        detail: language === 'es' ? 'Promedio temporal del modelo' : 'Temporary model average'
       }
     ]
-  }, [detections])
+  }, [detections, language, text])
 
   function handleFileSelected(file: File) {
     setSelectedFile(file)
@@ -194,7 +251,7 @@ export default function Dashboard({ userName }: DashboardProps) {
     setError('')
 
     try {
-      const prediction = await analyzeImage(selectedFile)
+      const prediction = await analyzeImage(selectedFile, language)
       setResult(prediction)
 
       const nextData = await loadDetections()
@@ -208,31 +265,32 @@ export default function Dashboard({ userName }: DashboardProps) {
 
   return (
     <main className="dashboardShell">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} text={text} />
       <section className="dashboardMain">
-        <Header userName={userName} />
+        <Header language={language} onLanguageChange={handleLanguageChange} text={text} userName={userName} />
 
         <div className="contentArea">
           {error ? <div className="statusBanner">{error}</div> : null}
 
           {activeView === 'species' ? (
-            <SpeciesGallery detections={detections} />
+            <SpeciesGallery detections={detections} language={language} text={text} />
           ) : (
             <>
-              <StatsCards metrics={metrics} />
+              <StatsCards metrics={metrics} text={text} />
 
               <section className="analysisGrid">
                 <UploadImage
                   fileName={selectedFile?.name ?? ''}
                   imagePreview={imagePreview}
                   isAnalyzing={isAnalyzing}
+                  text={text}
                   onAnalyze={handleAnalyze}
                   onFileSelected={handleFileSelected}
                 />
-                <DetectionResult result={result} />
+                <DetectionResult language={language} result={result} text={text} />
               </section>
 
-              <RecentDetections detections={detections} />
+              <RecentDetections detections={detections} language={language} text={text} />
             </>
           )}
         </div>
