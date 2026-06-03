@@ -2,36 +2,68 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, Grid2X2, History, Sprout } from 'lucide-react'
+import { FileText, Grid2X2, Headphones, Map, PawPrint, Sprout } from 'lucide-react'
+import type { DashboardView } from './dashboardTypes'
 
-const navItems = [
-  { href: '/', label: 'Panel de Control', icon: Grid2X2 },
-  { href: '/historial', label: 'Historial', icon: History },
-  { href: '/estadisticas', label: 'Estadisticas', icon: BarChart3 }
+const navItems: { label: string; icon: typeof Grid2X2; view: DashboardView }[] = [
+  { label: 'Panel de Control', icon: Grid2X2, view: 'dashboard' },
+  { label: 'Mapa de Campo', icon: Map, view: 'map' },
+  { label: 'Especies', icon: PawPrint, view: 'species' },
+  { label: 'Reportes', icon: FileText, view: 'reports' },
+  { label: 'Soporte', icon: Headphones, view: 'support' }
 ]
 
-export default function Sidebar() {
+const routeItems = [
+  { href: '/', label: 'Panel de Control', icon: Grid2X2 },
+  { href: '/historial', label: 'Historial', icon: FileText },
+  { href: '/estadisticas', label: 'Estadisticas', icon: PawPrint }
+]
+
+type SidebarProps = {
+  activeView?: DashboardView
+  onViewChange?: (view: DashboardView) => void
+}
+
+export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const pathname = usePathname()
 
   return (
     <aside className="sidebar" aria-label="Navegacion principal">
-      <Link className="sidebarBrand" href="/">
+      <div className="sidebarBrand">
         <Sprout size={28} />
         <strong>WildlifeAI</strong>
-      </Link>
+      </div>
 
       <nav className="sidebarNav">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const active = pathname === item.href
+        {onViewChange
+          ? navItems.map((item) => {
+              const Icon = item.icon
+              const isActive = item.view === activeView
 
-          return (
-            <Link className={active ? 'navItem active' : 'navItem'} href={item.href} key={item.href}>
-              <Icon size={22} />
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
+              return (
+                <button
+                  aria-current={isActive ? 'page' : undefined}
+                  className={isActive ? 'navItem active' : 'navItem'}
+                  key={item.label}
+                  onClick={() => onViewChange(item.view)}
+                  type="button"
+                >
+                  <Icon size={22} />
+                  <span>{item.label}</span>
+                </button>
+              )
+            })
+          : routeItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
+
+              return (
+                <Link className={isActive ? 'navItem active' : 'navItem'} href={item.href} key={item.href}>
+                  <Icon size={22} />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
       </nav>
 
       <div className="researcherCard">

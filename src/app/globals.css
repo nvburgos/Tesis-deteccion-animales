@@ -482,6 +482,30 @@ p {
   color: var(--primary-container);
 }
 
+.detectionPreview {
+  background: #101713;
+  border: 1px solid #d8e0db;
+  border-radius: 12px;
+  margin-top: 22px;
+  overflow: hidden;
+  position: relative;
+}
+
+.detectionPreviewImage {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+
+.detectionBox {
+  border: 3px solid #e02020;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.85),
+    0 0 18px rgba(224, 32, 32, 0.42);
+  pointer-events: none;
+  position: absolute;
+}
+
 .resultGrid {
   display: grid;
   gap: 14px;
@@ -952,6 +976,412 @@ td {
   text-align: center;
 }
 
+.speciesPanel {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.speciesHeader {
+  align-items: center;
+  min-height: 84px;
+}
+
+.speciesHeader p {
+  color: #4f5a55;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.speciesGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0 24px 24px;
+}
+
+.speciesCard {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 14px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.speciesCard:hover,
+.speciesCardActive {
+  border-color: var(--primary-muted);
+  box-shadow: 0 14px 28px rgba(27, 67, 50, 0.08);
+  transform: translateY(-1px);
+}
+
+.speciesCardActive {
+  outline: 3px solid rgba(143, 180, 159, 0.28);
+}
+
+.speciesImageWrap {
+  background: #dbe5df;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.speciesImage,
+.speciesImageFallback {
+  height: 100%;
+  width: 100%;
+}
+
+.speciesImage {
+  display: block;
+  object-fit: cover;
+}
+
+.speciesImageFallback {
+  align-items: center;
+  color: var(--primary-container);
+  display: flex;
+  justify-content: center;
+}
+
+.speciesBody {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.speciesMeta {
+  color: #59645f;
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.speciesBody h3 {
+  color: var(--primary);
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 6px 0 0;
+}
+
+.speciesStats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.speciesStats div {
+  background: white;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.speciesStats span,
+.speciesStats small {
+  display: block;
+}
+
+.speciesStats span {
+  color: var(--primary);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.speciesStats small {
+  color: #59645f;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
+.speciesBody time {
+  color: #4f5a55;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.speciesPhotos {
+  border-top: 1px solid #e1e7e3;
+  margin-top: 2px;
+  padding: 24px;
+}
+
+.speciesPhotosHeader {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.speciesPhotosHeader h3 {
+  color: var(--primary);
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 6px 0 0;
+}
+
+.speciesPhotosHeader strong {
+  background: var(--success);
+  border-radius: 999px;
+  color: var(--primary-container);
+  font-size: 12px;
+  line-height: 1;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.speciesPhotoGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.speciesPhotoCard {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.speciesPhoto {
+  aspect-ratio: 4 / 3;
+  background: #dbe5df;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.speciesPhotoCard div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.speciesPhotoCard strong {
+  color: var(--primary);
+  font-size: 15px;
+}
+
+.speciesPhotoCard time {
+  color: #59645f;
+  font-size: 12px;
+  text-align: right;
+}
+
+.speciesEmpty {
+  align-items: center;
+  color: #4f5a55;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 260px;
+  justify-content: center;
+  padding: 34px;
+  text-align: center;
+}
+
+.loginShell {
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgba(1, 45, 29, 0.06) 0 1px, transparent 1px),
+    linear-gradient(0deg, rgba(1, 45, 29, 0.05) 0 1px, transparent 1px),
+    var(--background);
+  background-size: 44px 44px;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.loginPanel {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  gap: 0;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1fr);
+  max-width: 900px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.loginBrand {
+  align-content: center;
+  background:
+    linear-gradient(160deg, rgba(27, 67, 50, 0.96), rgba(1, 45, 29, 0.96)),
+    #1b4332;
+  color: #edf5ef;
+  display: grid;
+  gap: 18px;
+  min-height: 520px;
+  padding: 42px;
+}
+
+.loginBrandMark {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  display: inline-flex;
+  height: 58px;
+  justify-content: center;
+  width: 58px;
+}
+
+.loginBrand strong,
+.loginBrand span {
+  display: block;
+}
+
+.loginBrand strong {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.loginBrand span {
+  color: #cfe0d6;
+  font-size: 15px;
+  line-height: 1.45;
+  margin-top: 10px;
+}
+
+.loginForm {
+  align-content: center;
+  display: grid;
+  gap: 18px;
+  padding: 42px;
+}
+
+.loginHeading {
+  margin-bottom: 6px;
+}
+
+.loginHeading h1 {
+  color: var(--primary);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.loginHeading p {
+  color: #4f5a55;
+  font-size: 15px;
+  line-height: 1.45;
+  margin-top: 10px;
+}
+
+.loginError {
+  background: var(--danger-bg);
+  border: 1px solid #efb4ad;
+  border-radius: 12px;
+  color: var(--danger-text);
+  font-size: 14px;
+  font-weight: 650;
+  padding: 12px 14px;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.fieldGroup > span:first-child {
+  color: #29312e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inputShell {
+  align-items: center;
+  background: #f7f9f8;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  color: #59645f;
+  display: flex;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 14px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.inputShell:focus-within {
+  background: white;
+  border-color: var(--primary-muted);
+  box-shadow: 0 0 0 3px rgba(143, 180, 159, 0.25);
+}
+
+.inputShell input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  flex: 1;
+  font: inherit;
+  min-width: 0;
+  outline: 0;
+}
+
+.inputShell input::placeholder {
+  color: #78837e;
+}
+
+.inputIconButton {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #59645f;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+}
+
+.loginButton {
+  justify-content: center;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.authSwitch {
+  color: #4f5a55;
+  font-size: 14px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.authSwitch a {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.authSwitch a:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 1180px) {
   .dashboardShell {
     grid-template-columns: 240px minmax(0, 1fr);
@@ -1027,6 +1457,24 @@ td {
   .analysisGrid {
     grid-template-columns: 1fr;
   }
+
+  .speciesGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .speciesPhotoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .loginPanel {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+  }
+
+  .loginBrand {
+    min-height: 0;
+    padding: 30px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1094,5 +1542,36 @@ td {
 
   .secondaryButton {
     flex: 1;
+  }
+
+  .speciesGrid {
+    grid-template-columns: 1fr;
+    padding: 0 16px 18px;
+  }
+
+  .speciesPhotos {
+    padding: 18px 16px;
+  }
+
+  .speciesPhotosHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .speciesPhotoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .loginShell {
+    padding: 16px;
+  }
+
+  .loginBrand,
+  .loginForm {
+    padding: 24px;
+  }
+
+  .loginHeading h1 {
+    font-size: 26px;
   }
 }

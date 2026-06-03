@@ -4,11 +4,11 @@ export type DetectionResultData = {
   species: string | null
   confidence: number
   priority: Priority
+  coordinates?: [number, number, number, number] | null
   message?: string
   imagePath?: string
   location?: string
   createdAt?: string
-  coordinates?: [number, number, number, number] | null
 }
 
 export type RecentDetection = {
@@ -31,3 +31,5 @@ export type DashboardMetric = {
   value: string
   detail: string
 }
+
+export type DashboardView = 'dashboard' | 'map' | 'species' | 'reports' | 'support'

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { seedDetectionsIfEmpty } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
 import { formatRelativeDate } from '@/lib/detections'
+import { AUTH_COOKIE, isValidSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +37,12 @@ function toPublicDetection(detection: {
 }
 
 export async function GET(request: NextRequest) {
+  const session = (await cookies()).get(AUTH_COOKIE)?.value
+
+  if (!isValidSession(session)) {
+    return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
+  }
+
   await seedDetectionsIfEmpty()
 
   const searchParams = request.nextUrl.searchParams
