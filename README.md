@@ -21,8 +21,9 @@ El proyecto tiene una interfaz web funcional en Next.js con React y TypeScript. 
 - Mantiene tarjetas superiores de metricas.
 - Mantiene una tabla de detecciones recientes.
 - Envia la imagen real al endpoint interno `POST /api/analyze`.
+- El analisis de IA se ejecuta en `python/predict.py` con este orden: SpeciesNet primero; si falla, MegaDetector + YOLO; si MegaDetector esta deshabilitado, YOLO directo.
 
-Tambien existe una implementacion previa de backend dentro de Next.js usando `POST /api/analyze`, Prisma, SQLite y un script Python con YOLO. Esa parte sirve como base para conectar el flujo definitivo con FastAPI o ajustar el frontend para usar la API interna de Next.
+El backend activo esta dentro de Next.js usando `POST /api/analyze`, Prisma, SQLite y el script Python `python/predict.py`. Actualmente no hay un backend FastAPI separado: la UI usa la API interna de Next.js.
 
 ## Tecnologias utilizadas
 
@@ -44,9 +45,10 @@ Tambien existe una implementacion previa de backend dentro de Next.js usando `PO
 ### Inteligencia artificial y procesamiento
 
 - **Python**: scripts de preparacion, entrenamiento y prediccion.
-- **Ultralytics YOLO**: modelo de deteccion de objetos.
-- **YOLOv8**: base para entrenamiento y prediccion.
-- **Modelo actual**: `python/best.pt` detecta solo `leopard`. Todavia no representa las especies objetivo del Proyecto Sacha.
+- **SpeciesNet**: clasificador/detector principal cuando `SPECIESNET_ENABLED` esta activo. El script lo ejecuta primero y usa `SPECIESNET_COUNTRY="ECU"` por defecto.
+- **MegaDetector**: detector de animales usado como fallback cuando SpeciesNet falla o esta deshabilitado. Filtra detecciones de categoria `animal`.
+- **Ultralytics YOLO / YOLOv8**: clasificador local usado despues de MegaDetector para asignar una especie configurada, o de forma directa si MegaDetector se deshabilita.
+- **Modelo YOLO actual**: `python/best.pt` detecta solo `leopard`. Todavia no representa las especies objetivo del Proyecto Sacha.
 
 ### Base de datos
 
@@ -68,7 +70,14 @@ Interfaz Next.js / React
   v
 Backend interno Next.js
   |
-  | procesa imagen con YOLO
+  | guarda imagen en public/uploads
+  | ejecuta python/predict.py
+  v
+Python predict.py
+  |
+  | 1. SpeciesNet si esta habilitado
+  | 2. si SpeciesNet falla: MegaDetector + YOLO
+  | 3. si MegaDetector esta deshabilitado: YOLO directo
   v
 Respuesta JSON
   |
@@ -98,10 +107,17 @@ Tambien existe este flujo interno de Next.js:
 POST /api/analyze
   -> guarda imagen en public/uploads
   -> ejecuta python/predict.py
+     -> intenta SpeciesNet
+     -> si SpeciesNet falla o se deshabilita, intenta MegaDetector
+     -> si MegaDetector detecta animal, clasifica especie con YOLO
+     -> si MegaDetector no detecta animal, devuelve Sin deteccion
+     -> si MegaDetector se deshabilita, ejecuta YOLO directo
   -> calcula prioridad
   -> guarda resultado en SQLite con Prisma
   -> retorna JSON
 ```
+
+Importante: YOLO sigue siendo parte del proyecto, pero ya no es necesariamente el primer modelo que se ejecuta. El camino principal actual es SpeciesNet cuando esta disponible.
 
 ## Estructura de carpetas
 
@@ -162,7 +178,7 @@ wildlife-ai-ui/
 | `package-lock.json` | Bloquea versiones instaladas de dependencias npm. |
 | `tsconfig.json` | Configuracion de TypeScript. |
 | `next.config.ts` | Configuracion de Next.js. |
-| `.env` | Variables de entorno locales como `DATABASE_URL`, `PYTHON_BIN` y `YOLO_MODEL_PATH`. |
+| `.env` | Variables de entorno locales como `DATABASE_URL`, `PYTHON_BIN`, `SPECIESNET_ENABLED`, `MEGADETECTOR_ENABLED`, `SPECIESNET_COUNTRY`, `MEGADETECTOR_THRESHOLD` y `YOLO_MODEL_PATH`. |
 | `.gitignore` | Archivos y carpetas ignoradas por Git. |
 | `DESIGN.md` | Documento de referencia visual del diseno. |
 | `README.md` | Documento principal del proyecto. Debe actualizarse cada vez que se realicen cambios. |
@@ -181,7 +197,7 @@ wildlife-ai-ui/
 
 | Archivo | Descripcion |
 | --- | --- |
-| `src/app/api/analyze/route.ts` | Endpoint `POST /api/analyze`. Recibe imagen, la guarda en `public/uploads`, ejecuta `python/predict.py`, calcula prioridad y guarda deteccion en SQLite. |
+| `src/app/api/analyze/route.ts` | Endpoint `POST /api/analyze`. Valida sesion, recibe imagen, la guarda en `public/uploads`, ejecuta `python/predict.py`, calcula prioridad y guarda deteccion en SQLite. |
 | `src/app/api/detections/route.ts` | Endpoint `GET /api/detections`. Devuelve metricas, coordenadas y detecciones. Soporta `limit=all`, `species` y `date`. |
 
 ### Componentes React
@@ -237,12 +253,12 @@ model Detection {
 
 | Archivo | Descripcion |
 | --- | --- |
-| `python/predict.py` | Ejecuta prediccion con YOLO sobre una imagen usando `python/best.pt`. Actualmente solo acepta la clase real `leopard`; clases no soportadas devuelven `Sin deteccion`. |
+| `python/predict.py` | Orquesta el flujo de IA. Primero intenta SpeciesNet. Si falla o se deshabilita, usa MegaDetector para detectar animales y YOLO para clasificar la especie. Si MegaDetector se deshabilita, ejecuta YOLO directo. |
 | `python/train.py` | Entrena un modelo YOLO usando `python/dataset/data.yaml` y copia el mejor peso a `python/best.pt`. |
 | `python/prepare_dataset.py` | Valida datasets YOLO en `python/datasets_raw`, remapea clases objetivo y genera `python/dataset/data.yaml` solo si hay imagenes y labels validos. |
 | `python/update_labels.py` | Script auxiliar para incrementar IDs de clases en archivos `.txt` de labels. Usar con cuidado. |
 | `python/wildlife_classes.yaml` | Catalogo inicial de especies objetivo: jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma. |
-| `python/requirements.txt` | Dependencias Python necesarias. |
+| `python/requirements.txt` | Dependencias Python necesarias: `speciesnet`, `megadetector` y `ultralytics`. |
 | `python/datasets_raw/` | Carpeta donde se colocan datasets fuente exportados en formato YOLO. |
 
 ### Carpeta Public
@@ -321,6 +337,12 @@ Crear o revisar `.env`:
 
 ```env
 DATABASE_URL="file:./dev.db"
+SPECIESNET_ENABLED="1"
+SPECIESNET_COUNTRY="ECU"
+SPECIESNET_TIMEOUT="120"
+MEGADETECTOR_ENABLED="1"
+MEGADETECTOR_MODEL="MDV5A"
+MEGADETECTOR_THRESHOLD="0.2"
 YOLO_MODEL_PATH="python/best.pt"
 PYTHON_BIN=".venv\\Scripts\\python.exe"
 ```
@@ -385,14 +407,129 @@ No se recomienda usar versiones alpha o beta de Python porque `torch` y `ultraly
 
 Este es el flujo activo de la UI actual.
 
+## Flujo de inteligencia artificial
+
+El archivo central del flujo de IA es:
+
+```text
+python/predict.py
+```
+
+El orden real de ejecucion es:
+
+1. **SpeciesNet**
+   - Se ejecuta primero si `SPECIESNET_ENABLED` no esta apagado.
+   - Usa `SPECIESNET_COUNTRY`, que por defecto es `ECU`.
+   - Devuelve especie, confianza, coordenadas de animal si las hay, modelo usado, etiqueta cruda y mensaje.
+   - Si SpeciesNet no encuentra animales, responde `Sin deteccion`.
+   - Si detecta animal pero no asigna especie concreta, responde `Sin deteccion` con confianza/coordenadas del animal detectado.
+
+2. **MegaDetector + YOLO**
+   - Se ejecuta solo si SpeciesNet falla o si `SPECIESNET_ENABLED=0`.
+   - MegaDetector detecta si existe un animal en la imagen.
+   - Usa `MEGADETECTOR_MODEL`, por defecto `MDV5A`.
+   - Usa `MEGADETECTOR_THRESHOLD`, por defecto `0.2`.
+   - Si MegaDetector no detecta animal, el flujo responde `Sin deteccion`.
+   - Si MegaDetector detecta animal, YOLO intenta clasificar la especie.
+
+3. **YOLO directo**
+   - Se ejecuta si `MEGADETECTOR_ENABLED=0` o si se llama al clasificador sin usar MegaDetector.
+   - Usa `YOLO_MODEL_PATH`.
+   - Si `YOLO_MODEL_PATH` no existe, intenta `python/best.pt`.
+   - Si tampoco existe `python/best.pt`, usa `yolov8n.pt`.
+   - En este momento `DISPLAY_SPECIES` solo acepta la clase `leopard`.
+   - Si YOLO devuelve una clase no configurada, responde `Sin deteccion` con `warning`.
+
+### Variables de entorno del flujo IA
+
+| Variable | Uso | Valor por defecto |
+| --- | --- | --- |
+| `PYTHON_BIN` | Ejecutable usado por Next.js para correr `python/predict.py`. | `python` |
+| `SPECIESNET_ENABLED` | Activa/desactiva SpeciesNet. Valores como `0`, `false`, `no` u `off` lo apagan. | activo |
+| `SPECIESNET_COUNTRY` | Pais usado por SpeciesNet para ajustar prediccion geografica. | `ECU` |
+| `SPECIESNET_TIMEOUT` | Tiempo maximo para ejecutar SpeciesNet, en segundos. | `120` |
+| `MEGADETECTOR_ENABLED` | Activa/desactiva MegaDetector como fallback. | activo |
+| `MEGADETECTOR_MODEL` | Modelo de MegaDetector a cargar. | `MDV5A` |
+| `MEGADETECTOR_THRESHOLD` | Umbral minimo para aceptar detecciones de MegaDetector. | `0.2` |
+| `YOLO_MODEL_PATH` | Ruta del modelo YOLO local. | `python/best.pt` si existe; si no, `yolov8n.pt` |
+
+### Salidas posibles de `python/predict.py`
+
+El script siempre imprime al final una linea JSON para que `src/app/api/analyze/route.ts` pueda leerla.
+
+Salida con especie identificada:
+
+```json
+{
+  "species": "Leopard",
+  "confidence": 87.42,
+  "coordinates": [120.5, 30.2, 430.8, 310.4],
+  "animalDetected": true,
+  "detector": "SpeciesNet",
+  "model": "modelo_usado",
+  "rawLabel": "etiqueta_original",
+  "message": "SpeciesNet identifico la especie como Leopard."
+}
+```
+
+Salida con animal detectado pero sin especie concreta:
+
+```json
+{
+  "species": "Sin deteccion",
+  "confidence": 63.25,
+  "coordinates": [120.5, 30.2, 430.8, 310.4],
+  "animalDetected": true,
+  "message": "SpeciesNet detecto un animal, pero no asigno una especie concreta."
+}
+```
+
+Salida sin animal:
+
+```json
+{
+  "species": "Sin deteccion",
+  "confidence": 0,
+  "coordinates": null,
+  "animalDetected": false,
+  "message": "SpeciesNet no encontro animales en la imagen."
+}
+```
+
+Salida de error controlado:
+
+```json
+{
+  "species": "Sin deteccion",
+  "confidence": 0,
+  "coordinates": null,
+  "error": "No se pudo ejecutar el flujo de deteccion: detalle del error"
+}
+```
+
 ## Contrato actual para `POST /api/analyze`
 
-El backend futuro debe recibir:
+El endpoint actual recibe:
 
 ```text
 multipart/form-data
 image: File
+location?: string
 ```
+
+Requiere una sesion valida. Si no existe sesion, responde `401` con `Sesion requerida`.
+
+Proceso interno del endpoint:
+
+1. Verifica cookie de autenticacion.
+2. Ejecuta `ensureDatabase()`.
+3. Recibe la imagen desde `FormData`.
+4. Guarda la imagen en `public/uploads`.
+5. Ejecuta `python/predict.py` usando `PYTHON_BIN`.
+6. Lee la ultima linea JSON impresa por Python.
+7. Calcula prioridad con `calculatePriority`.
+8. Guarda la deteccion en SQLite con Prisma.
+9. Devuelve el resultado al frontend.
 
 Respuesta esperada:
 
@@ -528,8 +665,11 @@ python/best.pt
 - Typecheck de TypeScript.
 - Endpoints internos `GET /api/detections` y `POST /api/analyze`.
 - Persistencia SQLite para el flujo interno `/api/analyze`.
+- Flujo IA en `python/predict.py` con SpeciesNet como primera opcion.
+- Fallback a MegaDetector + YOLO cuando SpeciesNet falla o se deshabilita.
+- Ejecucion directa de YOLO si MegaDetector esta deshabilitado.
 - Scripts base para preparar dataset, entrenar YOLO y predecir.
-- Prediccion Python sin fallback por nombre de archivo. Si YOLO falla, devuelve `Sin deteccion` con error controlado.
+- Prediccion Python sin fallback por nombre de archivo. Si el flujo IA falla, devuelve `Sin deteccion` con error controlado.
 - Configuracion inicial de especies objetivo en `python/wildlife_classes.yaml`.
 - Validaciones en `prepare_dataset.py` para no preparar datasets incompletos.
 
@@ -543,6 +683,7 @@ python/best.pt
 - Conectar el frontend a FastAPI solo cuando exista ese backend.
 - Decidir si se mantiene `POST /api/analyze` o si se reemplaza por FastAPI.
 - Persistir tambien los errores de ejecucion YOLO si se desea auditarlos historicamente.
+- Persistir de forma separada `detector`, `model`, `rawLabel`, `animalDetected` y `animalConfidence` si se desea auditoria completa del flujo IA.
 - Mejorar la visualizacion de cajas cuando existan multiples detecciones en una misma imagen.
 - Agregar seleccion real de camara o ubicacion.
 - Agregar autenticacion si el sistema se usara por varios usuarios.
@@ -576,6 +717,16 @@ Estado: funcional, pendiente o en revision.
 ```
 
 ## Bitacora de cambios
+
+### 2026-06-03
+
+Cambio: Actualizacion del README para documentar de forma exacta el flujo actual de IA: SpeciesNet como primera opcion, MegaDetector + YOLO como fallback y YOLO directo si MegaDetector esta deshabilitado.
+
+Archivos modificados:
+
+- `README.md`
+
+Estado: documentacion funcional. El README ahora especifica las variables de entorno, el contrato de `POST /api/analyze`, las salidas posibles de `python/predict.py` y el rol actual de SpeciesNet, MegaDetector y YOLO.
 
 ### 2026-06-02
 
