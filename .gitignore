@@ -4,6 +4,9 @@ node_modules/
 out/
 dist/
 build/
+next-dev.log
+next-dev.err.log
+tsconfig.tsbuildinfo
 
 # Python
 .venv/
@@ -17,6 +20,9 @@ python/runs/
 python/best.pt
 *.pt
 !python/.gitkeep
+
+# Base de datos local
+prisma/dev.db
 
 # Variables de entorno
 .env
