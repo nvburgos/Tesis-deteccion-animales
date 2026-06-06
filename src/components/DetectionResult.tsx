@@ -2,25 +2,51 @@
 
 import { AlertTriangle, CheckCircle2, SearchX } from 'lucide-react'
 import DetectionImage from './DetectionImage'
-import type { DetectionResultData } from './dashboardTypes'
+import { getSpeciesLabel, uiText, type UiText } from '@/lib/i18n'
+import type { DetectionResultData, Language, Priority } from './dashboardTypes'
 
 function formatConfidence(confidence: number) {
   const percent = confidence <= 1 ? confidence * 100 : confidence
   return `${Math.round(percent)}%`
 }
 
-export default function DetectionResult({ result }: { result: DetectionResultData | null }) {
+function getPriorityLabel(priority: Priority, language: Language) {
+  if (language === 'es') {
+    return priority
+  }
+
+  if (priority === 'Alta prioridad') {
+    return 'High priority'
+  }
+
+  if (priority === 'Revision manual') {
+    return 'Manual review'
+  }
+
+  return 'Normal'
+}
+
+export default function DetectionResult({
+  language = 'es',
+  result,
+  text = uiText[language]
+}: {
+  language?: Language
+  result: DetectionResultData | null
+  text?: UiText
+}) {
   const hasSpecies = Boolean(result?.species && result.species !== 'Sin deteccion')
+  const speciesLabel = getSpeciesLabel(result?.species, language)
 
   return (
-    <section className="resultCard" aria-label="Resultado de deteccion">
+    <section className="resultCard" aria-label={text.detectionResult}>
       <div className="resultHeading">
         <span className={hasSpecies ? 'resultIcon resultSuccess' : 'resultIcon'}>
           {hasSpecies ? <CheckCircle2 size={24} /> : <SearchX size={24} />}
         </span>
         <div>
-          <h2>Resultado del analisis</h2>
-          <p>{result ? 'Prediccion generada para la imagen cargada.' : 'Aun no hay una imagen analizada.'}</p>
+          <h2>{text.resultTitle}</h2>
+          <p>{result ? text.predictedImage : text.noAnalyzedImage}</p>
         </div>
       </div>
 
@@ -30,28 +56,28 @@ export default function DetectionResult({ result }: { result: DetectionResultDat
             confidence={result.confidence}
             coordinates={result.coordinates}
             imagePath={result.imagePath}
-            species={result.species}
+            species={hasSpecies ? speciesLabel : result.species}
           />
 
           <div className="resultGrid">
             <div>
-              <span>Especie detectada</span>
-              <strong>{result.species || 'Sin deteccion'}</strong>
+              <span>{text.speciesDetected}</span>
+              <strong>{speciesLabel}</strong>
             </div>
             <div>
-              <span>Confianza</span>
+              <span>{text.confidence}</span>
               <strong>{formatConfidence(result.confidence)}</strong>
             </div>
             <div>
-              <span>Prioridad</span>
-              <strong>{result.priority}</strong>
+              <span>{text.priority}</span>
+              <strong>{getPriorityLabel(result.priority, language)}</strong>
             </div>
           </div>
         </>
       ) : (
         <div className="emptyResult">
           <AlertTriangle size={20} />
-          <span>Selecciona una imagen y presiona Analizar imagen para ver la deteccion.</span>
+          <span>{text.emptyResult}</span>
         </div>
       )}
 

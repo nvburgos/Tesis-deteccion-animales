@@ -1,14 +1,20 @@
 'use client'
 
 import { ChartNoAxesColumn, Goal, Microscope, ScanSearch, type LucideIcon } from 'lucide-react'
+import { uiText, type UiText } from '@/lib/i18n'
 import type { DashboardMetric } from './dashboardTypes'
 
 const metricIcons: Record<string, LucideIcon> = {
   'Imagenes analizadas': ChartNoAxesColumn,
   'Total de imagenes analizadas': ChartNoAxesColumn,
+  'Analyzed images': ChartNoAxesColumn,
+  'Total analyzed images': ChartNoAxesColumn,
   'Total de detecciones': ScanSearch,
+  'Total detections': ScanSearch,
   'Especies detectadas': Microscope,
-  'Confianza promedio': Goal
+  'Detected species': Microscope,
+  'Confianza promedio': Goal,
+  'Average confidence': Goal
 }
 
 function MetricCard({ metric }: { metric: DashboardMetric }) {
@@ -28,9 +34,9 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
   )
 }
 
-export default function StatsCards({ metrics }: { metrics: DashboardMetric[] }) {
+export default function StatsCards({ metrics, text = uiText.es }: { metrics: DashboardMetric[]; text?: UiText }) {
   return (
-    <section className="metricsGrid" aria-label="Metricas principales">
+    <section className="metricsGrid" aria-label={text.mainMetrics}>
       {metrics.map((metric) => (
         <MetricCard key={metric.label} metric={metric} />
       ))}

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { PawPrint } from 'lucide-react'
-import type { RecentDetection } from './dashboardTypes'
+import { getSpeciesLabel, type UiText } from '@/lib/i18n'
+import type { Language, RecentDetection } from './dashboardTypes'
 
 type SpeciesSummary = {
   averageConfidence: number
@@ -51,20 +52,29 @@ function buildSpeciesSummaries(detections: RecentDetection[]) {
   return Array.from(summaries.values()).sort((left, right) => right.count - left.count)
 }
 
-export default function SpeciesGallery({ detections }: { detections: RecentDetection[] }) {
+export default function SpeciesGallery({
+  detections,
+  language,
+  text
+}: {
+  detections: RecentDetection[]
+  language: Language
+  text: UiText
+}) {
   const species = useMemo(() => buildSpeciesSummaries(detections), [detections])
   const [selectedSpecies, setSelectedSpecies] = useState('')
   const activeSpecies = selectedSpecies || species[0]?.name || ''
+  const activeSpeciesLabel = getSpeciesLabel(activeSpecies, language)
   const selectedDetections = detections
     .filter((detection) => detection.species === activeSpecies)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
 
   return (
-    <section className="speciesPanel" aria-label="Especies detectadas">
+    <section className="speciesPanel" aria-label={text.detectedSpecies}>
       <div className="panelHeader speciesHeader">
         <div>
-          <h2>Especies detectadas</h2>
-          <p>Selecciona una especie para revisar todas sus fotografias registradas.</p>
+          <h2>{text.detectedSpecies}</h2>
+          <p>{text.reviewPhotos}</p>
         </div>
       </div>
 
@@ -73,6 +83,7 @@ export default function SpeciesGallery({ detections }: { detections: RecentDetec
           <div className="speciesGrid">
             {species.map((item) => {
               const isActive = item.name === activeSpecies
+              const itemLabel = getSpeciesLabel(item.name, language)
 
               return (
                 <button
@@ -84,7 +95,7 @@ export default function SpeciesGallery({ detections }: { detections: RecentDetec
                 >
                   <div className="speciesImageWrap">
                     {item.imagePath ? (
-                      <img alt={`Registro de ${item.name}`} className="speciesImage" src={item.imagePath} />
+                      <img alt={`${text.lastRecord}: ${itemLabel}`} className="speciesImage" src={item.imagePath} />
                     ) : (
                       <div className="speciesImageFallback">
                         <PawPrint size={34} />
@@ -94,23 +105,23 @@ export default function SpeciesGallery({ detections }: { detections: RecentDetec
 
                   <div className="speciesBody">
                     <div>
-                      <span className="speciesMeta">Especie</span>
-                      <h3>{item.name}</h3>
+                      <span className="speciesMeta">{text.species}</span>
+                      <h3>{itemLabel}</h3>
                     </div>
 
                     <div className="speciesStats">
                       <div>
                         <span>{item.count}</span>
-                        <small>detecciones</small>
+                        <small>{text.detections}</small>
                       </div>
                       <div>
                         <span>{formatConfidence(item.averageConfidence)}</span>
-                        <small>confianza prom.</small>
+                        <small>{text.confidenceAvg}</small>
                       </div>
                     </div>
 
                     <time dateTime={item.lastSeen}>
-                      Ultimo registro: {new Date(item.lastSeen).toLocaleString('es-ES', {
+                      {text.lastRecord}: {new Date(item.lastSeen).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {
                         dateStyle: 'medium',
                         timeStyle: 'short'
                       })}
@@ -121,41 +132,45 @@ export default function SpeciesGallery({ detections }: { detections: RecentDetec
             })}
           </div>
 
-          <section className="speciesPhotos" aria-label={`Fotos de ${activeSpecies}`}>
+          <section className="speciesPhotos" aria-label={`${text.photos}: ${activeSpeciesLabel}`}>
             <div className="speciesPhotosHeader">
               <div>
-                <span className="speciesMeta">Galeria</span>
-                <h3>{activeSpecies}</h3>
+                <span className="speciesMeta">{text.gallery}</span>
+                <h3>{activeSpeciesLabel}</h3>
               </div>
-              <strong>{selectedDetections.length} fotos</strong>
+              <strong>{selectedDetections.length} {text.photos}</strong>
             </div>
 
             <div className="speciesPhotoGrid">
-              {selectedDetections.map((detection) => (
+              {selectedDetections.map((detection) => {
+                const speciesLabel = getSpeciesLabel(detection.species, language)
+
+                return (
                 <article className="speciesPhotoCard" key={detection.id}>
                   <img
-                    alt={`${detection.species} detectado`}
+                    alt={`${speciesLabel} ${language === 'es' ? 'detectado' : 'detected'}`}
                     className="speciesPhoto"
                     src={detection.imagePath}
                   />
                   <div>
                     <strong>{formatConfidence(detection.confidence)}</strong>
                     <time dateTime={detection.createdAt}>
-                      {new Date(detection.createdAt).toLocaleString('es-ES', {
+                      {new Date(detection.createdAt).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {
                         dateStyle: 'short',
                         timeStyle: 'short'
                       })}
                     </time>
                   </div>
                 </article>
-              ))}
+                )
+              })}
             </div>
           </section>
         </>
       ) : (
         <div className="speciesEmpty">
           <PawPrint size={34} />
-          <span>Aun no hay especies identificadas. Analiza imagenes hasta que SpeciesNet clasifique una especie.</span>
+          <span>{text.emptySpecies}</span>
         </div>
       )}
     </section>
