@@ -10,7 +10,7 @@ const navItems: { label: string; icon: typeof Grid2X2; view: DashboardView }[] =
   { label: 'Mapa de Campo', icon: Map, view: 'map' },
   { label: 'Especies', icon: PawPrint, view: 'species' },
   { label: 'Reportes', icon: FileText, view: 'reports' },
-  { label: 'Soporte', icon: Headphones, view: 'support' }
+  
 ]
 
 const routeItems = [
