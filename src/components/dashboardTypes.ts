@@ -22,6 +22,9 @@ export type RecentDetection = {
   priority: Priority
   createdAt: string
   time?: string
+  userId?: number | null
+  researcher?: string
+  researcherEmail?: string | null
   x1?: number | null
   y1?: number | null
   x2?: number | null

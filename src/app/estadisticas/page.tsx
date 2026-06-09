@@ -7,15 +7,36 @@ import StatsCards from '@/components/StatsCards'
 import type { DashboardMetric, RecentDetection } from '@/components/dashboardTypes'
 
 type DetectionsResponse = {
+  currentUser?: {
+    id: number
+    role: string
+  }
   detections: RecentDetection[]
+}
+
+type Investigator = {
+  id: number
+  email: string
+  institution: string | null
+  name: string
+}
+
+type InvestigatorsResponse = {
+  investigators: Investigator[]
 }
 
 function formatPercent(value: number) {
   return `${Math.round(value)}%`
 }
 
-async function fetchDetections() {
-  const response = await fetch('/api/detections?limit=all', { cache: 'no-store' })
+async function fetchDetections(researcherId = '') {
+  const params = new URLSearchParams({ limit: 'all' })
+
+  if (researcherId) {
+    params.set('researcherId', researcherId)
+  }
+
+  const response = await fetch(`/api/detections?${params.toString()}`, { cache: 'no-store' })
 
   if (!response.ok) {
     throw new Error('No se pudieron cargar las estadisticas')
@@ -24,17 +45,39 @@ async function fetchDetections() {
   return (await response.json()) as DetectionsResponse
 }
 
+async function fetchInvestigators() {
+  const response = await fetch('/api/investigators', { cache: 'no-store' })
+
+  if (!response.ok) {
+    return { investigators: [] }
+  }
+
+  return (await response.json()) as InvestigatorsResponse
+}
+
 export default function EstadisticasPage() {
   const [detections, setDetections] = useState<RecentDetection[]>([])
+  const [investigators, setInvestigators] = useState<Investigator[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [researcherFilter, setResearcherFilter] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchDetections()
-      .then((data) => setDetections(data.detections))
+    fetchDetections(researcherFilter)
+      .then((data) => {
+        const userIsAdmin = data.currentUser?.role === 'Admin'
+
+        setDetections(data.detections)
+        setIsAdmin(userIsAdmin)
+
+        if (userIsAdmin) {
+          fetchInvestigators().then((investigatorData) => setInvestigators(investigatorData.investigators))
+        }
+      })
       .catch((loadError: unknown) => {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando estadisticas')
       })
-  }, [])
+  }, [researcherFilter])
 
   const detectedRows = useMemo(
     () => detections.filter((detection) => detection.species !== 'Sin deteccion' && detection.confidence > 0),
@@ -92,6 +135,22 @@ export default function EstadisticasPage() {
 
         <div className="contentArea">
           {error ? <div className="statusBanner">{error}</div> : null}
+
+          {isAdmin ? (
+            <section className="filterPanel" aria-label="Filtro por investigador">
+              <label>
+                <span>Investigador</span>
+                <select value={researcherFilter} onChange={(event) => setResearcherFilter(event.target.value)}>
+                  <option value="">Todos los investigadores</option>
+                  {investigators.map((investigator) => (
+                    <option key={investigator.id} value={investigator.id}>
+                      {investigator.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+          ) : null}
 
           <StatsCards metrics={metrics} />
 

@@ -14,6 +14,8 @@ model Detection {
   confidence  Float
   location    String
   priority    String
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id])
   x1          Float?
   y1          Float?
   x2          Float?
@@ -29,4 +31,5 @@ model User {
   institution  String?
   role         String   @default("Investigador")
   createdAt    DateTime @default(now())
+  detections   Detection[]
 }

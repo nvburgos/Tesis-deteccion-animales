@@ -8,7 +8,7 @@ import { cookies } from 'next/headers'
 import { ensureDatabase } from '@/lib/database'
 import { calculatePriority } from '@/lib/detections'
 import { prisma } from '@/lib/prisma'
-import { AUTH_COOKIE, isValidSession } from '@/lib/auth'
+import { AUTH_COOKIE, getSessionUserId } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -62,12 +62,22 @@ function parsePrediction(stdout: string): PredictionResult {
 export async function POST(request: Request) {
   try {
     const session = (await cookies()).get(AUTH_COOKIE)?.value
+    const userId = getSessionUserId(session)
 
-    if (!isValidSession(session)) {
+    if (!userId) {
       return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
     }
 
     await ensureDatabase()
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'Sesion invalida' }, { status: 401 })
+    }
 
     const formData = await request.formData()
     const image = formData.get('image')
@@ -125,6 +135,7 @@ export async function POST(request: Request) {
         confidence: prediction.confidence,
         location,
         priority,
+        userId: user.id,
         x1: coordinates?.[0],
         y1: coordinates?.[1],
         x2: coordinates?.[2],
@@ -138,6 +149,8 @@ export async function POST(request: Request) {
       imagePath: detection.imagePath,
       location: detection.location,
       priority: detection.priority,
+      researcher: user.name,
+      userId: user.id,
       createdAt: detection.createdAt.toISOString(),
       coordinates,
       message: prediction.message,

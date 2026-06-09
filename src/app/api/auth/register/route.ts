@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { AUTH_COOKIE, createSessionValue } from '@/lib/auth'
+import { ADMIN_ROLE, AUTH_COOKIE, createSessionValue, INVESTIGATOR_ROLE } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { hashPassword } from '@/lib/passwords'
 import { prisma } from '@/lib/prisma'
@@ -32,18 +32,21 @@ export async function POST(request: Request) {
 
   try {
     await ensureDatabase()
+    const userCount = await prisma.user.count()
 
     const user = await prisma.user.create({
       data: {
         email,
         institution,
         name,
-        passwordHash: hashPassword(password)
+        passwordHash: hashPassword(password),
+        role: userCount === 0 ? ADMIN_ROLE : INVESTIGATOR_ROLE
       },
       select: {
         email: true,
         id: true,
-        name: true
+        name: true,
+        role: true
       }
     })
 
