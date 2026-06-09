@@ -37,6 +37,20 @@ export type DashboardMetric = {
   detail: string
 }
 
+export type BatchJob = {
+  id: number
+  completedAt: string | null
+  createdAt: string
+  error?: string | null
+  failedImages: number
+  processedImages: number
+  researcher?: string | null
+  researcherEmail?: string | null
+  status: string
+  totalImages: number
+  zipName: string
+}
+
 export type DashboardView = 'dashboard' | 'map' | 'species' | 'reports' | 'support'
 
 export type { Language }

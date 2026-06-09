@@ -226,14 +226,8 @@ def detect_animal_with_megadetector(image_path):
 
 
 def classify_species_with_yolo(image_path):
-    from ultralytics import YOLO
-
     model_path = get_model_path()
-
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"YOLO model not found at {model_path}")
-
-    model = YOLO(model_path)
+    model = load_yolo_model(model_path)
     print(f"YOLO model classes: {model.names}")
     results = model(image_path, verbose=False)
 
@@ -271,6 +265,16 @@ def classify_species_with_yolo(image_path):
         "rawLabel": raw_label,
         "model": os.path.basename(model_path),
     }
+
+
+@lru_cache(maxsize=2)
+def load_yolo_model(model_path):
+    from ultralytics import YOLO
+
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"YOLO model not found at {model_path}")
+
+    return YOLO(model_path)
 
 
 def predict(image_path):

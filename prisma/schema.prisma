@@ -16,11 +16,28 @@ model Detection {
   priority    String
   userId      Int?
   user        User?    @relation(fields: [userId], references: [id])
+  batchJobId  Int?
+  batchJob    BatchJob? @relation(fields: [batchJobId], references: [id])
   x1          Float?
   y1          Float?
   x2          Float?
   y2          Float?
   createdAt   DateTime @default(now())
+}
+
+model BatchJob {
+  id              Int      @id @default(autoincrement())
+  zipName         String
+  status          String   @default("Pendiente")
+  totalImages     Int      @default(0)
+  processedImages Int      @default(0)
+  failedImages    Int      @default(0)
+  error           String?
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  detections      Detection[]
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
 }
 
 model User {
@@ -32,4 +49,5 @@ model User {
   role         String   @default("Investigador")
   createdAt    DateTime @default(now())
   detections   Detection[]
+  batchJobs    BatchJob[]
 }

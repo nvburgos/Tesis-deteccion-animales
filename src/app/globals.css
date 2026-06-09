@@ -467,6 +467,48 @@ p {
   padding: 22px 24px 24px;
 }
 
+.uploadActions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.analysisProgress {
+  border-top: 1px solid #e1e7e3;
+  display: grid;
+  gap: 10px;
+  padding: 16px 24px 22px;
+}
+
+.analysisProgressMeta {
+  align-items: center;
+  color: #40504a;
+  display: flex;
+  font-size: 13px;
+  font-weight: 750;
+  justify-content: space-between;
+}
+
+.analysisProgressMeta strong {
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.analysisProgressTrack {
+  background: #e5ece7;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.analysisProgressTrack span {
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 320ms ease;
+}
+
 .selectedFile {
   color: #4a5550;
   font-size: 14px;
@@ -695,6 +737,57 @@ p {
   box-shadow: var(--shadow-card);
   margin-top: 24px;
   overflow: hidden;
+}
+
+.batchJobsPanel {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.batchJobsList {
+  display: grid;
+  padding: 0 24px 24px;
+}
+
+.batchJobRow {
+  align-items: center;
+  border-top: 1px solid #e1e7e3;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 68px;
+}
+
+.batchJobRow strong,
+.batchJobRow span {
+  display: block;
+}
+
+.batchJobRow strong {
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.batchJobRow span {
+  color: #65716c;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.batchStatus {
+  background: var(--surface-muted);
+  border: 1px solid var(--outline-strong);
+  border-radius: 999px;
+  color: #29312e;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
 }
 
 .filterPanel,

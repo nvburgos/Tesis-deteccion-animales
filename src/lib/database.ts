@@ -17,6 +17,7 @@ export async function ensureDatabase() {
       "location" TEXT NOT NULL,
       "priority" TEXT NOT NULL,
       "userId" INTEGER,
+      "batchJobId" INTEGER,
       "x1" REAL,
       "y1" REAL,
       "x2" REAL,
@@ -38,6 +39,21 @@ export async function ensureDatabase() {
   `)
 
   await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BatchJob" (
+      "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "zipName" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'Pendiente',
+      "totalImages" INTEGER NOT NULL DEFAULT 0,
+      "processedImages" INTEGER NOT NULL DEFAULT 0,
+      "failedImages" INTEGER NOT NULL DEFAULT 0,
+      "error" TEXT,
+      "userId" INTEGER NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "completedAt" DATETIME
+    );
+  `)
+
+  await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
   `)
 
@@ -48,8 +64,22 @@ export async function ensureDatabase() {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Detection" ADD COLUMN "userId" INTEGER;`)
   }
 
+  const hasBatchJobId = detectionColumns.some((column) => column.name === 'batchJobId')
+
+  if (!hasBatchJobId) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Detection" ADD COLUMN "batchJobId" INTEGER;`)
+  }
+
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "Detection_userId_idx" ON "Detection"("userId");
+  `)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "Detection_batchJobId_idx" ON "Detection"("batchJobId");
+  `)
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BatchJob_userId_idx" ON "BatchJob"("userId");
   `)
 
   const adminCount = await prisma.user.count({ where: { role: ADMIN_ROLE } })
