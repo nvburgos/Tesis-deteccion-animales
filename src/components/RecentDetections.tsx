@@ -39,10 +39,12 @@ function formatConfidence(confidence: number) {
 export default function RecentDetections({
   detections,
   language = 'es',
+  showResearcher = false,
   text = uiText[language]
 }: {
   detections: RecentDetection[]
   language?: Language
+  showResearcher?: boolean
   text?: UiText
 }) {
   return (
@@ -65,6 +67,7 @@ export default function RecentDetections({
             <tr>
               <th>{text.image}</th>
               <th>{text.speciesDetected}</th>
+              {showResearcher ? <th>Investigador</th> : null}
               <th>{text.cameraLocation}</th>
               <th>{text.priority}</th>
               <th>{language === 'es' ? 'Fecha/hora' : 'Date/time'}</th>
@@ -90,6 +93,12 @@ export default function RecentDetections({
                       )}
                     </td>
                     <td className="speciesCell">{speciesLabel}</td>
+                    {showResearcher ? (
+                      <td>
+                        <strong>{detection.researcher ?? 'Sin investigador'}</strong>
+                        {detection.researcherEmail ? <span className="tableSubtext">{detection.researcherEmail}</span> : null}
+                      </td>
+                    ) : null}
                     <td>{detection.location}</td>
                     <td>
                       <PriorityBadge language={language} priority={detection.priority} />
@@ -110,7 +119,7 @@ export default function RecentDetections({
               })
             ) : (
               <tr>
-                <td className="emptyState" colSpan={6}>
+                <td className="emptyState" colSpan={showResearcher ? 7 : 6}>
                   {text.emptyDetections}
                 </td>
               </tr>

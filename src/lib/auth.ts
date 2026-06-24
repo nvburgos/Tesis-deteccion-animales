@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export const AUTH_COOKIE = 'wildlife_session'
+export const ADMIN_ROLE = 'Admin'
+export const INVESTIGATOR_ROLE = 'Investigador'
 
 function getAuthSecret() {
   return process.env.AUTH_SECRET || 'wildlife-local-development-secret'
@@ -44,4 +46,8 @@ export function getSessionUserId(value?: string) {
 
 export function isValidSession(value?: string) {
   return getSessionUserId(value) !== null
+}
+
+export function isAdminRole(role?: string | null) {
+  return role === ADMIN_ROLE
 }

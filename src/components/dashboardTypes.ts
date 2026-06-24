@@ -22,6 +22,9 @@ export type RecentDetection = {
   priority: Priority
   createdAt: string
   time?: string
+  userId?: number | null
+  researcher?: string
+  researcherEmail?: string | null
   x1?: number | null
   y1?: number | null
   x2?: number | null
@@ -32,6 +35,20 @@ export type DashboardMetric = {
   label: string
   value: string
   detail: string
+}
+
+export type BatchJob = {
+  id: number
+  completedAt: string | null
+  createdAt: string
+  error?: string | null
+  failedImages: number
+  processedImages: number
+  researcher?: string | null
+  researcherEmail?: string | null
+  status: string
+  totalImages: number
+  zipName: string
 }
 
 export type DashboardView = 'dashboard' | 'map' | 'species' | 'reports' | 'support'

@@ -7,11 +7,32 @@ import Sidebar from '@/components/Sidebar'
 import type { RecentDetection } from '@/components/dashboardTypes'
 
 type DetectionsResponse = {
+  currentUser?: {
+    id: number
+    role: string
+  }
   detections: RecentDetection[]
 }
 
-async function fetchDetections() {
-  const response = await fetch('/api/detections?limit=all', { cache: 'no-store' })
+type Investigator = {
+  id: number
+  email: string
+  institution: string | null
+  name: string
+}
+
+type InvestigatorsResponse = {
+  investigators: Investigator[]
+}
+
+async function fetchDetections(researcherId = '') {
+  const params = new URLSearchParams({ limit: 'all' })
+
+  if (researcherId) {
+    params.set('researcherId', researcherId)
+  }
+
+  const response = await fetch(`/api/detections?${params.toString()}`, { cache: 'no-store' })
 
   if (!response.ok) {
     throw new Error('No se pudo cargar el historial')
@@ -20,19 +41,41 @@ async function fetchDetections() {
   return (await response.json()) as DetectionsResponse
 }
 
+async function fetchInvestigators() {
+  const response = await fetch('/api/investigators', { cache: 'no-store' })
+
+  if (!response.ok) {
+    return { investigators: [] }
+  }
+
+  return (await response.json()) as InvestigatorsResponse
+}
+
 export default function HistorialPage() {
   const [detections, setDetections] = useState<RecentDetection[]>([])
+  const [investigators, setInvestigators] = useState<Investigator[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [researcherFilter, setResearcherFilter] = useState('')
   const [speciesFilter, setSpeciesFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchDetections()
-      .then((data) => setDetections(data.detections))
+    fetchDetections(researcherFilter)
+      .then((data) => {
+        const userIsAdmin = data.currentUser?.role === 'Admin'
+
+        setDetections(data.detections)
+        setIsAdmin(userIsAdmin)
+
+        if (userIsAdmin) {
+          fetchInvestigators().then((investigatorData) => setInvestigators(investigatorData.investigators))
+        }
+      })
       .catch((loadError: unknown) => {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando historial')
       })
-  }, [])
+  }, [researcherFilter])
 
   const speciesOptions = useMemo(
     () =>
@@ -66,6 +109,20 @@ export default function HistorialPage() {
           {error ? <div className="statusBanner">{error}</div> : null}
 
           <section className="filterPanel" aria-label="Filtros de historial">
+            {isAdmin ? (
+              <label>
+                <span>Investigador</span>
+                <select value={researcherFilter} onChange={(event) => setResearcherFilter(event.target.value)}>
+                  <option value="">Todos los investigadores</option>
+                  {investigators.map((investigator) => (
+                    <option key={investigator.id} value={investigator.id}>
+                      {investigator.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             <label>
               <span>Especie</span>
               <select value={speciesFilter} onChange={(event) => setSpeciesFilter(event.target.value)}>
@@ -88,6 +145,7 @@ export default function HistorialPage() {
               onClick={() => {
                 setSpeciesFilter('')
                 setDateFilter('')
+                setResearcherFilter('')
               }}
               type="button"
             >
@@ -95,7 +153,7 @@ export default function HistorialPage() {
             </button>
           </section>
 
-          <RecentDetections detections={filteredDetections} />
+          <RecentDetections detections={filteredDetections} showResearcher={isAdmin} />
         </div>
       </section>
     </main>

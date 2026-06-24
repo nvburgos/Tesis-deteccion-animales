@@ -9,7 +9,15 @@ import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
 import UploadImage from './UploadImage'
 import { getSpeciesLabel, uiText } from '@/lib/i18n'
-import type { DashboardMetric, DashboardView, DetectionResultData, Language, Priority, RecentDetection } from './dashboardTypes'
+import type {
+  BatchJob,
+  DashboardMetric,
+  DashboardView,
+  DetectionResultData,
+  Language,
+  Priority,
+  RecentDetection
+} from './dashboardTypes'
 
 type DashboardData = {
   metrics: DashboardMetric[]
@@ -19,6 +27,15 @@ type DashboardData = {
 type BackendAnalyzeResponse = Partial<DetectionResultData> & {
   error?: string
   warning?: string
+}
+
+type BatchesResponse = {
+  jobs: BatchJob[]
+}
+
+type BatchAnalyzeResponse = {
+  error?: string
+  job?: BatchJob
 }
 
 type DashboardProps = {
@@ -153,13 +170,46 @@ async function loadDetections(): Promise<DashboardData> {
   }
 }
 
+async function loadBatchJobs(): Promise<BatchJob[]> {
+  const response = await fetch('/api/batches', { cache: 'no-store' })
+
+  if (!response.ok) {
+    return []
+  }
+
+  const data = await readJsonResponse<BatchesResponse>(response)
+  return data.jobs
+}
+
+async function analyzeBatch(file: File): Promise<BatchJob> {
+  const formData = new FormData()
+  formData.append('zip', file)
+  formData.append('location', 'Camara 01 | Zona Norte')
+
+  const response = await fetch('/api/batches', {
+    body: formData,
+    method: 'POST'
+  })
+  const data = await readJsonResponse<BatchAnalyzeResponse>(response)
+
+  if (!response.ok || !data.job) {
+    throw new Error(data.error ?? 'No se pudo procesar el lote')
+  }
+
+  return data.job
+}
+
 export default function Dashboard({ userName }: DashboardProps) {
   const [activeView, setActiveView] = useState<DashboardView>('dashboard')
+  const [batchFile, setBatchFile] = useState<File | null>(null)
+  const [batchJobs, setBatchJobs] = useState<BatchJob[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState('')
   const [result, setResult] = useState<DetectionResultData | null>(null)
   const [detections, setDetections] = useState<RecentDetection[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState(0)
   const [error, setError] = useState('')
   const [language, setLanguage] = useState<Language>('es')
   const text = uiText[language]
@@ -196,7 +246,31 @@ export default function Dashboard({ userName }: DashboardProps) {
       .catch((loadError: unknown) => {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando detecciones')
       })
+
+    loadBatchJobs().then(setBatchJobs)
   }, [])
+
+  useEffect(() => {
+    const isProcessing = isAnalyzing || isBatchProcessing
+
+    if (!isProcessing) {
+      return
+    }
+
+    setAnalysisProgress(8)
+    const intervalId = window.setInterval(() => {
+      setAnalysisProgress((currentProgress) => {
+        if (currentProgress >= 92) {
+          return currentProgress
+        }
+
+        const increment = currentProgress < 45 ? 7 : currentProgress < 75 ? 4 : 2
+        return Math.min(92, currentProgress + increment)
+      })
+    }, 700)
+
+    return () => window.clearInterval(intervalId)
+  }, [isAnalyzing, isBatchProcessing])
 
   const metrics = useMemo<DashboardMetric[]>(() => {
     const analyzed = detections.length
@@ -237,7 +311,16 @@ export default function Dashboard({ userName }: DashboardProps) {
 
   function handleFileSelected(file: File) {
     setSelectedFile(file)
+    setBatchFile(null)
     setImagePreview(URL.createObjectURL(file))
+    setResult(null)
+    setError('')
+  }
+
+  function handleZipSelected(file: File) {
+    setBatchFile(file)
+    setSelectedFile(null)
+    setImagePreview('')
     setResult(null)
     setError('')
   }
@@ -248,10 +331,12 @@ export default function Dashboard({ userName }: DashboardProps) {
     }
 
     setIsAnalyzing(true)
+    setAnalysisProgress(8)
     setError('')
 
     try {
       const prediction = await analyzeImage(selectedFile, language)
+      setAnalysisProgress(100)
       setResult(prediction)
 
       const nextData = await loadDetections()
@@ -259,7 +344,37 @@ export default function Dashboard({ userName }: DashboardProps) {
     } catch (analysisError: unknown) {
       setError(analysisError instanceof Error ? analysisError.message : 'Error analizando la imagen')
     } finally {
-      setIsAnalyzing(false)
+      window.setTimeout(() => {
+        setIsAnalyzing(false)
+        setAnalysisProgress(0)
+      }, 450)
+    }
+  }
+
+  async function handleBatchAnalyze() {
+    if (!batchFile) {
+      return
+    }
+
+    setIsBatchProcessing(true)
+    setAnalysisProgress(8)
+    setError('')
+
+    try {
+      const job = await analyzeBatch(batchFile)
+      setAnalysisProgress(100)
+      setBatchJobs((currentJobs) => [job, ...currentJobs.filter((currentJob) => currentJob.id !== job.id)].slice(0, 12))
+      setBatchFile(null)
+
+      const nextData = await loadDetections()
+      setDetections(nextData.detections)
+    } catch (batchError: unknown) {
+      setError(batchError instanceof Error ? batchError.message : 'Error procesando el ZIP')
+    } finally {
+      window.setTimeout(() => {
+        setIsBatchProcessing(false)
+        setAnalysisProgress(0)
+      }, 450)
     }
   }
 
@@ -280,15 +395,42 @@ export default function Dashboard({ userName }: DashboardProps) {
 
               <section className="analysisGrid">
                 <UploadImage
+                  analysisProgress={analysisProgress}
+                  batchFileName={batchFile?.name ?? ''}
                   fileName={selectedFile?.name ?? ''}
                   imagePreview={imagePreview}
                   isAnalyzing={isAnalyzing}
+                  isBatchProcessing={isBatchProcessing}
                   text={text}
                   onAnalyze={handleAnalyze}
+                  onBatchAnalyze={handleBatchAnalyze}
                   onFileSelected={handleFileSelected}
+                  onZipSelected={handleZipSelected}
                 />
                 <DetectionResult language={language} result={result} text={text} />
               </section>
+
+              {batchJobs.length > 0 ? (
+                <section className="batchJobsPanel" aria-label="Trabajos por lotes">
+                  <div className="panelHeader">
+                    <h2>Trabajos por lotes</h2>
+                  </div>
+                  <div className="batchJobsList">
+                    {batchJobs.map((job) => (
+                      <div className="batchJobRow" key={job.id}>
+                        <div>
+                          <strong>{job.zipName}</strong>
+                          <span>
+                            {job.processedImages}/{job.totalImages} imagenes procesadas
+                            {job.failedImages > 0 ? ` | ${job.failedImages} con error` : ''}
+                          </span>
+                        </div>
+                        <span className="batchStatus">{job.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               <RecentDetections detections={detections} language={language} text={text} />
             </>
