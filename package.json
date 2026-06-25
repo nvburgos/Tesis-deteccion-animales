@@ -19,7 +19,8 @@
     "next": "latest",
     "prisma": "^6.19.3",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "latest",

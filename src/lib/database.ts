@@ -22,6 +22,8 @@ export async function ensureDatabase() {
       "y1" REAL,
       "x2" REAL,
       "y2" REAL,
+      "manualReviewedAt" DATETIME,
+      "manualReviewNote" TEXT,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `)
@@ -68,6 +70,18 @@ export async function ensureDatabase() {
 
   if (!hasBatchJobId) {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Detection" ADD COLUMN "batchJobId" INTEGER;`)
+  }
+
+  const hasManualReviewedAt = detectionColumns.some((column) => column.name === 'manualReviewedAt')
+
+  if (!hasManualReviewedAt) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Detection" ADD COLUMN "manualReviewedAt" DATETIME;`)
+  }
+
+  const hasManualReviewNote = detectionColumns.some((column) => column.name === 'manualReviewNote')
+
+  if (!hasManualReviewNote) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Detection" ADD COLUMN "manualReviewNote" TEXT;`)
   }
 
   await prisma.$executeRawUnsafe(`
