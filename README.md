@@ -373,13 +373,25 @@ http://localhost:3000
 
 ## Configuracion de Python
 
-Se recomienda usar Python 3.11 o 3.12.
+Se recomienda usar Python 3.11 para mayor estabilidad con paquetes de vision por computador y machine learning. Python 3.12 tambien puede usarse, pero requiere ONNX `>=1.16.2` para evitar compilaciones locales de versiones antiguas.
 
 ```bash
-py -3.12 -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip
 python -m pip install -r python\requirements.txt
+```
+
+La instalacion principal incluye SpeciesNet, Ultralytics YOLO y ONNX compatible:
+
+```bash
+python -m pip install -r python/requirements.txt
+```
+
+MegaDetector standalone se mantiene como fallback opcional. Si quieres activar ese respaldo, instala:
+
+```bash
+python -m pip install -r python/requirements-fallback.txt
 ```
 
 No se recomienda usar versiones alpha o beta de Python porque `torch` y `ultralytics` pueden no tener paquetes compatibles.

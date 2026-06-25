@@ -181,7 +181,13 @@ def run_speciesnet(image_path):
 
 @lru_cache(maxsize=1)
 def load_megadetector():
-    from megadetector.detection.run_detector import load_detector
+    try:
+        from megadetector.detection.run_detector import load_detector
+    except ImportError as error:
+        raise RuntimeError(
+            "MegaDetector optional dependency is not installed. "
+            "Install it with: python -m pip install -r python/requirements-fallback.txt"
+        ) from error
 
     model_name = os.environ.get("MEGADETECTOR_MODEL", "MDV5A")
     return load_detector(model_name)
@@ -282,10 +288,14 @@ def predict(image_path):
         try:
             return run_speciesnet(image_path)
         except Exception as error:
-            print(f"SpeciesNet failed, falling back to MegaDetector + YOLO: {error}", file=sys.stderr)
+            print(f"SpeciesNet failed, trying fallback flow: {error}", file=sys.stderr)
 
     if env_flag("MEGADETECTOR_ENABLED", True):
-        detection = detect_animal_with_megadetector(image_path)
+        try:
+            detection = detect_animal_with_megadetector(image_path)
+        except RuntimeError as error:
+            print(f"Warning: {error}. Falling back to YOLO direct.", file=sys.stderr)
+            return classify_species_with_yolo(image_path)
 
         if not detection["animalDetected"]:
             return {
