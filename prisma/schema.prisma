@@ -22,6 +22,8 @@ model Detection {
   y1          Float?
   x2          Float?
   y2          Float?
+  manualReviewedAt DateTime?
+  manualReviewNote String?
   createdAt   DateTime @default(now())
 }
 

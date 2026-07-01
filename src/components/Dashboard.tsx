@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import DetectionResult from './DetectionResult'
-import Header from './Header'
+import Header, { type HeaderNotification } from './Header'
+import ManualReviewsPanel from './ManualReviewsPanel'
 import RecentDetections from './RecentDetections'
+import ReportsPanel from './ReportsPanel'
 import Sidebar from './Sidebar'
 import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
+import SupportUnavailable from './SupportUnavailable'
 import UploadImage from './UploadImage'
 import { getSpeciesLabel, uiText } from '@/lib/i18n'
 import type {
@@ -133,6 +136,13 @@ function normalizeDetection(detection: RecentDetection): RecentDetection {
     confidence,
     priority: normalizePriority(detection.priority, detection.species, confidence)
   }
+}
+
+function formatNotificationDate(value: string, language: Language) {
+  return new Date(value).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  })
 }
 
 async function analyzeImage(file: File, language: Language): Promise<DetectionResultData> {
@@ -282,9 +292,6 @@ export default function Dashboard({ userName }: DashboardProps) {
         .map((detection) => detection.species)
         .filter((species) => species && species !== 'Sin deteccion')
     ).size
-    const averageConfidence =
-      analyzed > 0 ? Math.round(detections.reduce((total, detection) => total + detection.confidence, 0) / analyzed) : 0
-
     return [
       {
         label: text.analyzedImages,
@@ -300,14 +307,57 @@ export default function Dashboard({ userName }: DashboardProps) {
         label: text.detectedSpecies,
         value: detectedSpecies.toString(),
         detail: text.countDistinctSpecies
-      },
-      {
-        label: text.averageConfidence,
-        value: `${averageConfidence}%`,
-        detail: language === 'es' ? 'Promedio temporal del modelo' : 'Temporary model average'
       }
     ]
   }, [detections, language, text])
+
+  const notifications = useMemo<HeaderNotification[]>(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const todayDetections = detections.filter((detection) => detection.createdAt.slice(0, 10) === today)
+    const highPriority = detections
+      .filter((detection) => detection.priority === 'Alta prioridad')
+      .slice(0, 3)
+      .map((detection) => ({
+        description: `${detection.species} en ${detection.location}`,
+        id: `high-${detection.id}`,
+        time: formatNotificationDate(detection.createdAt, language),
+        title: 'Hallazgo de alta prioridad',
+        tone: 'alert' as const
+      }))
+    const reviewItems = detections
+      .filter((detection) => detection.priority === 'Revision manual' && !detection.manualReviewedAt)
+      .slice(0, 3)
+      .map((detection) => ({
+        description:
+          detection.species === 'Sin deteccion'
+            ? `Imagen pendiente de revisar en ${detection.location}`
+            : `${detection.species} requiere validacion`,
+        id: `review-${detection.id}`,
+        time: formatNotificationDate(detection.createdAt, language),
+        title: 'Revision manual pendiente',
+        tone: 'review' as const
+      }))
+    const batchItems = batchJobs.slice(0, 3).map((job) => ({
+      description: `${job.processedImages}/${job.totalImages} imagenes procesadas${job.failedImages > 0 ? `, ${job.failedImages} con error` : ''}`,
+      id: `batch-${job.id}`,
+      time: formatNotificationDate(job.completedAt ?? job.createdAt, language),
+      title: job.status === 'Fallido' ? 'Lote fallido' : `Lote ${job.status.toLowerCase()}`,
+      tone: job.status === 'Fallido' ? ('error' as const) : job.failedImages > 0 ? ('review' as const) : ('success' as const)
+    }))
+    const summary =
+      todayDetections.length > 0
+        ? [
+            {
+              description: `${todayDetections.length} imagenes analizadas hoy`,
+              id: 'today-summary',
+              title: 'Resumen del dia',
+              tone: 'info' as const
+            }
+          ]
+        : []
+
+    return [...highPriority, ...reviewItems, ...batchItems, ...summary].slice(0, 8)
+  }, [batchJobs, detections, language])
 
   function handleFileSelected(file: File) {
     setSelectedFile(file)
@@ -323,6 +373,12 @@ export default function Dashboard({ userName }: DashboardProps) {
     setImagePreview('')
     setResult(null)
     setError('')
+  }
+
+  function handleManualReviewCompleted(updatedDetection: RecentDetection) {
+    setDetections((currentDetections) =>
+      currentDetections.map((detection) => (detection.id === updatedDetection.id ? normalizeDetection(updatedDetection) : detection))
+    )
   }
 
   async function handleAnalyze() {
@@ -382,13 +438,30 @@ export default function Dashboard({ userName }: DashboardProps) {
     <main className="dashboardShell">
       <Sidebar activeView={activeView} onViewChange={setActiveView} text={text} />
       <section className="dashboardMain">
-        <Header language={language} onLanguageChange={handleLanguageChange} text={text} userName={userName} />
+        <Header
+          language={language}
+          notifications={notifications}
+          onLanguageChange={handleLanguageChange}
+          text={text}
+          userName={userName}
+        />
 
         <div className="contentArea">
           {error ? <div className="statusBanner">{error}</div> : null}
 
           {activeView === 'species' ? (
             <SpeciesGallery detections={detections} language={language} text={text} />
+          ) : activeView === 'reviews' ? (
+            <ManualReviewsPanel
+              detections={detections}
+              language={language}
+              onReviewCompleted={handleManualReviewCompleted}
+              text={text}
+            />
+          ) : activeView === 'reports' ? (
+            <ReportsPanel seedDetections={detections} language={language} text={text} />
+          ) : activeView === 'support' ? (
+            <SupportUnavailable text={text} />
           ) : (
             <>
               <StatsCards metrics={metrics} text={text} />

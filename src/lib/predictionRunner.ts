@@ -1,12 +1,14 @@
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import sharp from 'sharp'
 import { calculatePriority } from '@/lib/detections'
 import { prisma } from '@/lib/prisma'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
+const defaultMaxImageDimension = 1280
 
 export type PredictionResult = {
   species: string
@@ -33,13 +35,43 @@ export function sanitizeFilename(filename: string) {
   return filename.replace(/[^a-zA-Z0-9.-]/g, '-').toLowerCase()
 }
 
-function quote(value: string) {
-  return `"${value.replace(/"/g, '\\"')}"`
-}
-
 function getDefaultModelPath() {
   const customModelPath = path.join(process.cwd(), 'python', 'best.pt')
   return existsSync(customModelPath) ? customModelPath : path.join(process.cwd(), 'yolov8n.pt')
+}
+
+function getMaxImageDimension() {
+  const configuredValue = Number(process.env.ANALYSIS_MAX_IMAGE_DIMENSION ?? defaultMaxImageDimension)
+  return Number.isFinite(configuredValue) && configuredValue > 0 ? configuredValue : defaultMaxImageDimension
+}
+
+async function optimizeImageForAnalysis(buffer: Buffer) {
+  const maxDimension = getMaxImageDimension()
+
+  try {
+    const optimizedBuffer = await sharp(buffer)
+      .rotate()
+      .resize({
+        fit: 'inside',
+        height: maxDimension,
+        width: maxDimension,
+        withoutEnlargement: true
+      })
+      .jpeg({ mozjpeg: true, quality: 82 })
+      .toBuffer()
+
+    return {
+      buffer: optimizedBuffer,
+      extension: '.jpg'
+    }
+  } catch (error) {
+    console.warn('Image optimization failed, saving original upload:', error)
+
+    return {
+      buffer,
+      extension: null
+    }
+  }
 }
 
 function parsePrediction(stdout: string): PredictionResult {
@@ -60,6 +92,13 @@ function parsePrediction(stdout: string): PredictionResult {
   }
 
   return parsed
+}
+
+function getPredictionEnvironment() {
+  return {
+    ...process.env,
+    YOLO_MODEL_PATH: process.env.YOLO_MODEL_PATH || getDefaultModelPath()
+  }
 }
 
 function parseBatchPredictions(stdout: string): BatchPredictionResult[] {
@@ -86,12 +125,17 @@ export async function saveUploadedImage(image: File) {
   const bytes = await image.arrayBuffer()
   const buffer = Buffer.from(bytes)
   const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-  const filename = `${Date.now()}-${sanitizeFilename(image.name || 'camera-trap.jpg')}`
+  const optimizedImage = await optimizeImageForAnalysis(buffer)
+  const originalName = sanitizeFilename(image.name || 'camera-trap.jpg')
+  const parsedName = path.parse(originalName)
+  const filename = optimizedImage.extension
+    ? `${Date.now()}-${sanitizeFilename(parsedName.name || 'camera-trap')}${optimizedImage.extension}`
+    : `${Date.now()}-${originalName}`
   const diskPath = path.join(uploadDir, filename)
   const publicPath = `/uploads/${filename}`
 
   await mkdir(uploadDir, { recursive: true })
-  await writeFile(diskPath, buffer)
+  await writeFile(diskPath, optimizedImage.buffer)
 
   return { diskPath, publicPath }
 }
@@ -110,12 +154,8 @@ export async function copyBatchImageToUploads(sourcePath: string, jobId: number)
 
 export async function runPrediction(diskPath: string) {
   const pythonBin = process.env.PYTHON_BIN || 'python'
-  const command = `${pythonBin} ${quote(path.join(process.cwd(), 'python', 'predict.py'))} ${quote(diskPath)}`
-  const { stdout } = await execAsync(command, {
-    env: {
-      ...process.env,
-      YOLO_MODEL_PATH: process.env.YOLO_MODEL_PATH || getDefaultModelPath()
-    },
+  const { stdout } = await execFileAsync(pythonBin, [path.join(process.cwd(), 'python', 'predict.py'), diskPath], {
+    env: getPredictionEnvironment(),
     timeout: 120000
   })
 
@@ -124,12 +164,8 @@ export async function runPrediction(diskPath: string) {
 
 export async function runBatchPredictions(manifestPath: string) {
   const pythonBin = process.env.PYTHON_BIN || 'python'
-  const command = `${pythonBin} ${quote(path.join(process.cwd(), 'python', 'predict_batch.py'))} ${quote(manifestPath)}`
-  const { stdout } = await execAsync(command, {
-    env: {
-      ...process.env,
-      YOLO_MODEL_PATH: process.env.YOLO_MODEL_PATH || getDefaultModelPath()
-    },
+  const { stdout } = await execFileAsync(pythonBin, [path.join(process.cwd(), 'python', 'predict_batch.py'), manifestPath], {
+    env: getPredictionEnvironment(),
     timeout: 120000 * 10
   })
 
