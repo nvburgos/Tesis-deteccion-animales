@@ -56,7 +56,8 @@ Thumbs.db
 # ===========================
 python/best.pt
 python/dataset/
-python/datasets_raw/
+python/datasets_raw/*
+!python/datasets_raw/.gitkeep
 
 # Base de datos local
 prisma/dev.db
