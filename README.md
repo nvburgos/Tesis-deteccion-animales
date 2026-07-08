@@ -23,7 +23,7 @@ El proyecto tiene una interfaz web funcional en Next.js con React y TypeScript. 
 - Envia la imagen real al endpoint interno `POST /api/analyze`.
 - El analisis de IA se ejecuta en `python/predict.py`. El camino principal usa SpeciesNet, que integra deteccion, clasificacion y ensemble. Si SpeciesNet no puede ejecutarse o se deshabilita, el proyecto usa un respaldo propio con MegaDetector standalone + YOLO.
 
-El backend activo esta dentro de Next.js usando `POST /api/analyze`, Prisma, SQLite y el script Python `python/predict.py`. Actualmente no hay un backend FastAPI separado: la UI usa la API interna de Next.js.
+El backend activo esta dentro de Next.js usando `POST /api/analyze`, Prisma, PostgreSQL y el script Python `python/predict.py`. Actualmente no hay un backend FastAPI separado: la UI usa la API interna de Next.js.
 
 ## Tecnologias utilizadas
 
@@ -39,7 +39,7 @@ El backend activo esta dentro de Next.js usando `POST /api/analyze`, Prisma, SQL
 
 - **Next.js API Routes**: endpoints internos en `src/app/api`.
 - **Prisma ORM**: acceso a la base de datos.
-- **SQLite**: base de datos local de desarrollo.
+- **PostgreSQL**: base de datos relacional usada por Prisma.
 - **Node.js**: ejecucion del servidor Next y llamada a scripts Python.
 
 ### Inteligencia artificial y procesamiento
@@ -53,8 +53,8 @@ El backend activo esta dentro de Next.js usando `POST /api/analyze`, Prisma, SQL
 ### Base de datos
 
 - **Prisma Client**: cliente para consultar y guardar detecciones.
-- **SQLite**: archivo local `prisma/dev.db`.
-- Tabla principal: `Detection`.
+- **PostgreSQL**: base de datos configurada con `DATABASE_URL`.
+- Tablas principales: `User`, `Detection` y `BatchJob`.
 
 ## Arquitectura general
 
@@ -118,7 +118,7 @@ POST /api/analyze
      -> si MegaDetector standalone no detecta animal, devuelve Sin deteccion
      -> si MegaDetector standalone se deshabilita, ejecuta YOLO directo
   -> calcula prioridad
-  -> guarda resultado en SQLite con Prisma
+  -> guarda resultado en PostgreSQL con Prisma
   -> retorna JSON
 ```
 
@@ -130,7 +130,6 @@ Importante: SpeciesNet y MegaDetector no deben entenderse como dos pasos indepen
 wildlife-ai-ui/
 +-- prisma/
 |   +-- schema.prisma
-|   +-- dev.db
 +-- public/
 |   +-- uploads/
 +-- python/
@@ -202,7 +201,7 @@ wildlife-ai-ui/
 
 | Archivo | Descripcion |
 | --- | --- |
-| `src/app/api/analyze/route.ts` | Endpoint `POST /api/analyze`. Valida sesion, recibe imagen, la guarda en `public/uploads`, ejecuta `python/predict.py`, calcula prioridad y guarda deteccion en SQLite. |
+| `src/app/api/analyze/route.ts` | Endpoint `POST /api/analyze`. Valida sesion, recibe imagen, la guarda en `public/uploads`, ejecuta `python/predict.py`, calcula prioridad y guarda deteccion en PostgreSQL. |
 | `src/app/api/detections/route.ts` | Endpoint `GET /api/detections`. Devuelve metricas, coordenadas y detecciones. Soporta `limit=all`, `species` y `date`. |
 
 ### Componentes React
@@ -233,8 +232,7 @@ wildlife-ai-ui/
 
 | Archivo | Descripcion |
 | --- | --- |
-| `prisma/schema.prisma` | Define el datasource SQLite y el modelo `Detection`. |
-| `prisma/dev.db` | Base de datos SQLite local de desarrollo. |
+| `prisma/schema.prisma` | Define el datasource PostgreSQL y los modelos `User`, `Detection` y `BatchJob`. |
 
 Modelo `Detection`:
 
@@ -305,10 +303,10 @@ npm run prisma:generate
 Genera Prisma Client.
 
 ```bash
-npm run prisma:push
+npm run prisma:migrate -- --name init_postgresql
 ```
 
-Sincroniza el schema Prisma con SQLite.
+Ejecuta migraciones Prisma contra PostgreSQL.
 
 ```bash
 npm run prepare:dataset
@@ -341,7 +339,7 @@ npm install
 Crear o revisar `.env`:
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://usuario:password@localhost:5432/wildlifeai?schema=public"
 SPECIESNET_ENABLED="1"
 SPECIESNET_COUNTRY="ECU"
 SPECIESNET_TIMEOUT="120"
@@ -352,11 +350,27 @@ YOLO_MODEL_PATH="python/best.pt"
 PYTHON_BIN=".venv\\Scripts\\python.exe"
 ```
 
-### 3. Configurar Prisma
+### 3. Configurar PostgreSQL y Prisma
+
+WildlifeAI usaba antes SQLite. La configuracion actual usa PostgreSQL mediante Prisma y el archivo `prisma/dev.db` fue eliminado. Antes de ejecutar migraciones, crea la base de datos `wildlifeai` en PostgreSQL y ajusta el usuario/password en `.env`.
+
+Formato esperado:
+
+```env
+DATABASE_URL="postgresql://usuario:password@localhost:5432/wildlifeai?schema=public"
+```
+
+Ejecutar la migracion inicial y regenerar Prisma Client:
 
 ```bash
+npx prisma migrate dev --name init_postgresql
 npx prisma generate
-npm run prisma:push
+```
+
+Para abrir Prisma Studio:
+
+```bash
+npx prisma studio
 ```
 
 ### 4. Ejecutar frontend
@@ -419,7 +433,7 @@ No se recomienda usar versiones alpha o beta de Python porque `torch` y `ultraly
 3. Ejecuta `python/predict.py`.
 4. Lee el JSON devuelto por Python.
 5. Calcula prioridad con `calculatePriority`.
-6. Guarda deteccion en SQLite.
+6. Guarda deteccion en PostgreSQL.
 7. Devuelve resultado al cliente.
 
 Este es el flujo activo de la UI actual.
@@ -549,7 +563,7 @@ Proceso interno del endpoint:
 5. Ejecuta `python/predict.py` usando `PYTHON_BIN`.
 6. Lee la ultima linea JSON impresa por Python.
 7. Calcula prioridad con `calculatePriority`.
-8. Guarda la deteccion en SQLite con Prisma.
+8. Guarda la deteccion en PostgreSQL con Prisma.
 9. Devuelve el resultado al frontend.
 
 Respuesta esperada:
@@ -685,7 +699,7 @@ python/best.pt
 - Build de Next.js.
 - Typecheck de TypeScript.
 - Endpoints internos `GET /api/detections` y `POST /api/analyze`.
-- Persistencia SQLite para el flujo interno `/api/analyze`.
+- Persistencia PostgreSQL para el flujo interno `/api/analyze`.
 - Flujo IA en `python/predict.py` con SpeciesNet como camino principal integrado: detector, clasificador y ensemble.
 - Respaldo operativo con MegaDetector standalone + YOLO cuando SpeciesNet no puede ejecutarse o se deshabilita.
 - Ejecucion directa de YOLO si el MegaDetector standalone esta deshabilitado.
