@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import type { Prisma } from '@prisma/client'
 import { seedDetectionsIfEmpty } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
-import { formatRelativeDate } from '@/lib/detections'
+import { calculatePriority, formatRelativeDate, normalizeSpecies } from '@/lib/detections'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -19,6 +19,8 @@ function toPublicDetection(detection: {
   y1: number | null
   x2: number | null
   y2: number | null
+  manualReviewedAt: Date | null
+  manualReviewNote: string | null
   createdAt: Date
   userId: number | null
   user?: {
@@ -38,6 +40,8 @@ function toPublicDetection(detection: {
     y1: detection.y1,
     x2: detection.x2,
     y2: detection.y2,
+    manualReviewedAt: detection.manualReviewedAt?.toISOString() ?? null,
+    manualReviewNote: detection.manualReviewNote,
     userId: detection.userId,
     researcher: detection.user?.name ?? 'Sin investigador',
     researcherEmail: detection.user?.email ?? null,
@@ -156,4 +160,80 @@ export async function GET(request: NextRequest) {
     ],
     detections: detections.map(toPublicDetection)
   })
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = (await cookies()).get(AUTH_COOKIE)?.value
+  const userId = getSessionUserId(session)
+
+  if (!userId) {
+    return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
+  }
+
+  await seedDetectionsIfEmpty()
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true }
+  })
+
+  if (!currentUser) {
+    return NextResponse.json({ error: 'Sesion invalida' }, { status: 401 })
+  }
+
+  const body = (await request.json().catch(() => null)) as { detectionId?: number; note?: string; species?: string } | null
+  const detectionId = Number(body?.detectionId)
+  const reviewedSpecies = body?.species?.trim()
+
+  if (!Number.isInteger(detectionId) || detectionId <= 0) {
+    return NextResponse.json({ error: 'Detection id invalido' }, { status: 400 })
+  }
+
+  const detection = await prisma.detection.findUnique({
+    where: { id: detectionId },
+    select: { confidence: true, id: true, priority: true, species: true, userId: true }
+  })
+
+  if (!detection) {
+    return NextResponse.json({ error: 'Deteccion no encontrada' }, { status: 404 })
+  }
+
+  if (!isAdminRole(currentUser.role) && detection.userId !== currentUser.id) {
+    return NextResponse.json({ error: 'No autorizado para revisar esta deteccion' }, { status: 403 })
+  }
+
+  if (detection.priority !== 'Revision manual') {
+    return NextResponse.json({ error: 'Esta deteccion no requiere revision manual' }, { status: 400 })
+  }
+
+  if (!reviewedSpecies) {
+    return NextResponse.json({ error: 'La especie revisada es requerida' }, { status: 400 })
+  }
+
+  const normalizedReviewedSpecies = normalizeSpecies(reviewedSpecies)
+  const reviewedPriority =
+    normalizedReviewedSpecies === 'sin deteccion'
+      ? 'Revision manual'
+      : calculatePriority(reviewedSpecies, Math.max(detection.confidence, 1))
+
+  const updatedDetection = await prisma.detection.update({
+    where: { id: detectionId },
+    data: {
+      manualReviewNote: body?.note?.trim() || null,
+      manualReviewedAt: new Date(),
+      priority: reviewedPriority,
+      species: reviewedSpecies
+    },
+    include: {
+      user: {
+        select: {
+          email: true,
+          id: true,
+          name: true
+        }
+      }
+    }
+  })
+
+  return NextResponse.json({ detection: toPublicDetection(updatedDetection) })
 }

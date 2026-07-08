@@ -1,3 +1,5 @@
-megadetector
-speciesnet
-ultralytics
+speciesnet==5.0.5
+ultralytics==8.4.76
+onnx>=1.16.2,<1.23
+Pillow>=9.5
+PyYAML>=5.3.1

@@ -92,7 +92,12 @@ export default function RecentDetections({
                         <span className="wildlifeThumb" aria-hidden="true" />
                       )}
                     </td>
-                    <td className="speciesCell">{speciesLabel}</td>
+                    <td className="speciesCell">
+                      {speciesLabel}
+                      {detection.manualReviewNote ? (
+                        <span className="tableSubtext">Observacion: {detection.manualReviewNote}</span>
+                      ) : null}
+                    </td>
                     {showResearcher ? (
                       <td>
                         <strong>{detection.researcher ?? 'Sin investigador'}</strong>

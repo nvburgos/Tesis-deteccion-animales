@@ -25,6 +25,8 @@ export type RecentDetection = {
   userId?: number | null
   researcher?: string
   researcherEmail?: string | null
+  manualReviewedAt?: string | null
+  manualReviewNote?: string | null
   x1?: number | null
   y1?: number | null
   x2?: number | null
@@ -51,6 +53,6 @@ export type BatchJob = {
   zipName: string
 }
 
-export type DashboardView = 'dashboard' | 'map' | 'species' | 'reports' | 'support'
+export type DashboardView = 'dashboard' | 'map' | 'species' | 'reviews' | 'reports' | 'support'
 
 export type { Language }

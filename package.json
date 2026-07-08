@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
     "prepare:dataset": ".venv\\Scripts\\python.exe python\\prepare_dataset.py",
     "train:yolo": ".venv\\Scripts\\python.exe python\\train.py",
     "predict:yolo": ".venv\\Scripts\\python.exe python\\predict.py"
@@ -19,7 +20,8 @@
     "next": "latest",
     "prisma": "^6.19.3",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "latest",

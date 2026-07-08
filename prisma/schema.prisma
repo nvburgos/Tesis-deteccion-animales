@@ -3,51 +3,53 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Detection {
-  id          Int      @id @default(autoincrement())
-  imagePath   String
-  species     String
-  confidence  Float
-  location    String
-  priority    String
-  userId      Int?
-  user        User?    @relation(fields: [userId], references: [id])
-  batchJobId  Int?
-  batchJob    BatchJob? @relation(fields: [batchJobId], references: [id])
-  x1          Float?
-  y1          Float?
-  x2          Float?
-  y2          Float?
-  createdAt   DateTime @default(now())
+  id               Int       @id @default(autoincrement())
+  imagePath        String
+  species          String
+  confidence       Float
+  location         String
+  priority         String
+  userId           Int?
+  user             User?     @relation(fields: [userId], references: [id])
+  batchJobId       Int?
+  batchJob         BatchJob? @relation(fields: [batchJobId], references: [id])
+  x1               Float?
+  y1               Float?
+  x2               Float?
+  y2               Float?
+  manualReviewedAt DateTime?
+  manualReviewNote String?
+  createdAt        DateTime  @default(now())
 }
 
 model BatchJob {
-  id              Int      @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   zipName         String
-  status          String   @default("Pendiente")
-  totalImages     Int      @default(0)
-  processedImages Int      @default(0)
-  failedImages    Int      @default(0)
+  status          String      @default("Pendiente")
+  totalImages     Int         @default(0)
+  processedImages Int         @default(0)
+  failedImages    Int         @default(0)
   error           String?
   userId          Int
-  user            User     @relation(fields: [userId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
   detections      Detection[]
-  createdAt       DateTime @default(now())
+  createdAt       DateTime    @default(now())
   completedAt     DateTime?
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
+  id           Int         @id @default(autoincrement())
   name         String
-  email        String   @unique
+  email        String      @unique
   passwordHash String
   institution  String?
-  role         String   @default("Investigador")
-  createdAt    DateTime @default(now())
+  role         String      @default("Investigador")
+  createdAt    DateTime    @default(now())
   detections   Detection[]
   batchJobs    BatchJob[]
 }

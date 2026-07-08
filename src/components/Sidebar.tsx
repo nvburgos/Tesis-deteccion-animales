@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileText, Grid2X2, Headphones, Map, PawPrint, Sprout, Users } from 'lucide-react'
+import { ClipboardCheck, FileText, Grid2X2, Headphones, Map, PawPrint, Sprout, Users } from 'lucide-react'
 import { uiText, type UiText } from '@/lib/i18n'
 import type { DashboardView } from './dashboardTypes'
 
@@ -11,6 +11,7 @@ const navItems: { labelKey: keyof UiText; icon: typeof Grid2X2; view: DashboardV
   { labelKey: 'dashboard', icon: Grid2X2, view: 'dashboard' },
   { labelKey: 'fieldMap', icon: Map, view: 'map' },
   { labelKey: 'species', icon: PawPrint, view: 'species' },
+  { labelKey: 'reviews', icon: ClipboardCheck, view: 'reviews' },
   { labelKey: 'reports', icon: FileText, view: 'reports' },
   { labelKey: 'support', icon: Headphones, view: 'support' }
 ]
