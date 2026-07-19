@@ -28,6 +28,8 @@ export type DetectionResultData = {
   imagePath?: string
   location?: string
   createdAt?: string
+  capturedAt?: string | null
+  captureDateSource?: string | null
   cameraId?: number | null
   batchJobId?: number | null
   camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
@@ -41,6 +43,8 @@ export type RecentDetection = {
   location: string
   priority: Priority
   createdAt: string
+  capturedAt?: string | null
+  captureDateSource?: string | null
   time?: string
   cameraId?: number | null
   batchJobId?: number | null
@@ -67,6 +71,7 @@ export type BatchJob = {
   completedAt: string | null
   createdAt: string
   error?: string | null
+  detectionsFound?: number
   failedImages: number
   pendingImages?: number
   percentage?: number | null

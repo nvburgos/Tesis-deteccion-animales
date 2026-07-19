@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import json
 import os
 import sys
@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from capture_datetime import extract_capture_datetime
 from speciesnet import DEFAULT_MODEL, SpeciesNet
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
@@ -44,6 +45,7 @@ def list_images(folder):
     )
 
 
+
 def normalized_bbox_to_xyxy(bbox, image_size):
     width, height = image_size
     x, y, box_width, box_height = bbox
@@ -70,6 +72,7 @@ def speciesnet_class_to_display_name(label):
 
 
 def prediction_to_result(image_path, prediction):
+    captured_at, capture_date_source = extract_capture_datetime(image_path)
     detections = prediction.get("detections", [])
     animal_detections = [
         detection for detection in detections if str(detection.get("category")) == "1"
@@ -91,6 +94,8 @@ def prediction_to_result(image_path, prediction):
             "species": "Sin deteccion",
             "confidence": 0,
             "coordinates": None,
+            "capturedAt": captured_at,
+            "captureDateSource": capture_date_source,
             "animalDetected": False,
             "detector": "SpeciesNet",
             "model": prediction.get("model_version"),
@@ -102,6 +107,8 @@ def prediction_to_result(image_path, prediction):
             "species": "Sin deteccion",
             "confidence": animal_confidence,
             "coordinates": coordinates,
+            "capturedAt": captured_at,
+            "captureDateSource": capture_date_source,
             "animalDetected": True,
             "animalConfidence": animal_confidence,
             "detector": "SpeciesNet",
@@ -114,6 +121,8 @@ def prediction_to_result(image_path, prediction):
         "species": species,
         "confidence": confidence,
         "coordinates": coordinates,
+        "capturedAt": captured_at,
+        "captureDateSource": capture_date_source,
         "animalDetected": True,
         "animalConfidence": animal_confidence,
         "detector": "SpeciesNet",
@@ -224,6 +233,8 @@ def run_batch(folder, batch_size, timeout_seconds):
                 "species": "Sin deteccion",
                 "confidence": 0,
                 "coordinates": None,
+                "capturedAt": extract_capture_datetime(image_path)[0],
+                "captureDateSource": extract_capture_datetime(image_path)[1],
                 "error": "SpeciesNet did not return a prediction for this image",
             })
         else:

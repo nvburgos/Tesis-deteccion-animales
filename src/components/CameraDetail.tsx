@@ -18,6 +18,7 @@ import SpeciesDistribution from './SpeciesDistribution'
 import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
 import SupportUnavailable from './SupportUnavailable'
+import UploadTabs, { type UploadTab } from './UploadTabs'
 import { getSpeciesLabel, uiText } from '@/lib/i18n'
 import type {
   BatchJob,
@@ -42,6 +43,15 @@ type BackendAnalyzeResponse = Partial<DetectionResultData> & {
 
 type BatchesResponse = {
   jobs: BatchJob[]
+}
+
+type CameraStatsResponse = {
+  completedBatches: number
+  totalImages: number
+  totalDetections: number
+  totalSpecies: number
+  imagesWithoutDetection: number
+  error?: string
 }
 
 type BatchAnalyzeResponse = {
@@ -211,6 +221,17 @@ async function loadDetections(cameraId: number): Promise<DashboardData> {
   }
 }
 
+async function loadCameraStats(cameraId: number): Promise<CameraStatsResponse> {
+  const response = await fetch(`/api/cameras/${cameraId}/stats`, { cache: 'no-store' })
+  const data = await readJsonResponse<CameraStatsResponse>(response)
+
+  if (!response.ok) {
+    throw new Error(data.error ?? 'No se pudieron cargar las estadisticas de la camara')
+  }
+
+  return data
+}
+
 async function loadBatchJobs(cameraId: number): Promise<BatchJob[]> {
   const response = await fetch(`/api/batches?cameraId=${cameraId}`, { cache: 'no-store' })
 
@@ -256,7 +277,6 @@ async function analyzeBatch(file: File, camera: CameraSummary): Promise<BatchJob
   formData.append('cameraId', String(camera.id))
   formData.append('location', `${camera.name} | ${camera.zone}`)
 
-  console.log('[batch-debug] POST enviado', { cameraId: camera.id, zipName: file.name })
 
   const response = await fetch('/api/batches', {
     body: formData,
@@ -264,14 +284,12 @@ async function analyzeBatch(file: File, camera: CameraSummary): Promise<BatchJob
   })
   const data = await readJsonResponse<BatchAnalyzeResponse>(response)
 
-  console.log('[batch-debug] Respuesta recibida', data)
 
   if (!response.ok) {
     throw new Error(data.error ?? 'No se pudo crear el lote')
   }
 
   const job = createPendingBatchFromResponse(file, camera, data)
-  console.log('[batch-debug] batchId recibido', job.id)
   return job
 }
 async function loadBatchDetail(batchId: number, page: number, filters: BatchDetectionFilters): Promise<BatchDetailResponse> {
@@ -299,7 +317,9 @@ async function loadBatchDetail(batchId: number, page: number, filters: BatchDete
 export default function CameraDetail({ camera }: { camera: CameraSummary }) {
   const [activeView, setActiveView] = useState<DashboardView>('dashboard')
   const [batchFile, setBatchFile] = useState<File | null>(null)
+  const [uploadTab, setUploadTab] = useState<UploadTab>('zip')
   const [batchJobs, setBatchJobs] = useState<BatchJob[]>([])
+  const [cameraStats, setCameraStats] = useState<CameraStatsResponse | null>(null)
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<BatchJob | null>(null)
   const [batchSummary, setBatchSummary] = useState<BatchSummaryData | null>(null)
@@ -318,9 +338,6 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
   const [error, setError] = useState('')
   const [language, setLanguage] = useState<Language>('es')
   const text = uiText[language]
-
-  console.log('[batch-debug] render selectedBatchId:', selectedBatchId)
-  console.log('[batch-debug] render selectedBatch:', selectedBatch)
 
   useEffect(() => {
     const savedLanguage = window.localStorage.getItem('wildlifeai-language')
@@ -355,8 +372,13 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando detecciones')
       })
 
+    loadCameraStats(camera.id)
+      .then((stats) => setCameraStats(stats))
+      .catch((loadError: unknown) => {
+        setError(loadError instanceof Error ? loadError.message : 'Error cargando estadisticas de la camara')
+      })
+
     loadBatchJobs(camera.id).then((jobs) => {
-      console.log('[batch-debug] refreshBatches resultado:', jobs)
       setBatchJobs(jobs)
       if (jobs[0]) {
         setSelectedBatch((current) => current ?? jobs[0])
@@ -427,40 +449,42 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
   }, [isAnalyzing, isBatchProcessing])
 
   const metrics = useMemo<DashboardMetric[]>(() => {
-    const analyzed = detections.length
-    const totalDetections = detections.filter(
-      (detection) => detection.species !== 'Sin deteccion' && detection.confidence > 0
-    ).length
-    const detectedSpecies = new Set(
-      detections
-        .map((detection) => detection.species)
-        .filter((species) => species && species !== 'Sin deteccion')
-    ).size
-    const processedLots = batchJobs.filter((job) => job.status === 'Completado' || job.status === 'Completado con errores').length
+    const stats = cameraStats ?? {
+      completedBatches: 0,
+      totalImages: 0,
+      totalDetections: 0,
+      totalSpecies: 0,
+      imagesWithoutDetection: 0
+    }
 
     return [
       {
-        label: 'Total de lotes procesados',
-        value: processedLots.toLocaleString('es-ES'),
-        detail: 'Lotes ZIP completados para esta camara'
+        label: 'Lotes procesados',
+        value: stats.completedBatches.toLocaleString('es-ES'),
+        detail: 'Procesamientos completados para esta camara'
       },
       {
-        label: 'Total de imagenes analizadas',
-        value: analyzed.toLocaleString('es-ES'),
-        detail: 'Registros asociados a esta camara'
+        label: 'Im\u00e1genes analizadas',
+        value: stats.totalImages.toLocaleString('es-ES'),
+        detail: 'Total hist\u00f3rico de im\u00e1genes analizadas'
       },
       {
-        label: 'Total de detecciones',
-        value: totalDetections.toLocaleString('es-ES'),
-        detail: 'Imagenes con animal detectado'
+        label: 'Detecciones',
+        value: stats.totalDetections.toLocaleString('es-ES'),
+        detail: 'Detecciones registradas hist\u00f3ricamente'
       },
       {
-        label: 'Especies detectadas',
-        value: detectedSpecies.toLocaleString('es-ES'),
-        detail: 'Especies distintas en esta camara'
+        label: 'Especies registradas',
+        value: stats.totalSpecies.toLocaleString('es-ES'),
+        detail: 'Especies diferentes registradas'
+      },
+      {
+        label: 'Im\u00e1genes sin detecci\u00f3n',
+        value: stats.imagesWithoutDetection.toLocaleString('es-ES'),
+        detail: 'Im\u00e1genes sin presencia de fauna detectada'
       }
     ]
-  }, [batchJobs, detections])
+  }, [cameraStats])
 
   const notifications = useMemo<HeaderNotification[]>(() => {
     const highPriority = detections
@@ -565,11 +589,9 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
       setBatchJobs((currentJobs) => [job, ...currentJobs.filter((currentJob) => currentJob.id !== job.id)])
       setSelectedBatchId(job.id)
       setSelectedBatch(job)
-      console.log('[batch-debug] selectedBatch actualizado', { batchId: job.id, status: job.status })
       setBatchFile(null)
 
       const detail = await loadBatchDetail(job.id, 1, emptyBatchFilters)
-      console.log('[batch-debug] Detalle inicial cargado', { batchId: job.id, status: detail.job?.status ?? detail.summary?.status })
 
       if (detail.job) {
         setSelectedBatchId(detail.job.id)
@@ -654,7 +676,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
           {error ? <div className="statusBanner">{error}</div> : null}
 
           {activeView === 'species' ? (
-            <SpeciesGallery detections={detections} language={language} text={text} />
+            <SpeciesGallery camera={camera} detections={detections} language={language} onOpenDetection={setSelectedDetection} text={text} />
           ) : activeView === 'reviews' ? (
             <ManualReviewsPanel
               detections={detections}
@@ -670,11 +692,31 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
             <>
               <StatsCards metrics={metrics} text={text} />
 
-              <BatchUploadPanel
-                file={batchFile}
-                isProcessing={isBatchProcessing}
-                onAnalyze={handleBatchAnalyze}
-                onZipSelected={handleZipSelected}
+              <UploadTabs
+                activeTab={uploadTab}
+                onTabChange={setUploadTab}
+                zipContent={(
+                  <BatchUploadPanel
+                    file={batchFile}
+                    isProcessing={isBatchProcessing}
+                    lastProcessedAt={batchJobs[0]?.completedAt ?? batchJobs[0]?.createdAt ?? camera.lastUploadAt}
+                    onAnalyze={handleBatchAnalyze}
+                    onZipSelected={handleZipSelected}
+                  />
+                )}
+                imageContent={(
+                <IndividualAnalysisPanel
+                  analysisProgress={analysisProgress}
+                  fileName={selectedFile?.name ?? ''}
+                  imagePreview={imagePreview}
+                  isAnalyzing={isAnalyzing}
+                  language={language}
+                  onAnalyze={handleAnalyze}
+                  onFileSelected={handleFileSelected}
+                  result={result}
+                  text={text}
+                />
+                )}
               />
 
               {(selectedBatchId || selectedBatch || isBatchProcessing) ? (
@@ -703,18 +745,6 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
               />
 
               <BatchHistory jobs={batchJobs} onSelect={handleSelectBatch} selectedBatchId={selectedBatchId} />
-
-              <IndividualAnalysisPanel
-                analysisProgress={analysisProgress}
-                fileName={selectedFile?.name ?? ''}
-                imagePreview={imagePreview}
-                isAnalyzing={isAnalyzing}
-                language={language}
-                onAnalyze={handleAnalyze}
-                onFileSelected={handleFileSelected}
-                result={result}
-                text={text}
-              />
             </>
           )}
         </div>
@@ -730,6 +760,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
     </main>
   )
 }
+
 
 
 

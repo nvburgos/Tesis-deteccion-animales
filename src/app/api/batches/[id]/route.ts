@@ -75,6 +75,8 @@ function toPublicDetection(detection: {
   manualReviewedAt: Date | null
   manualReviewNote: string | null
   createdAt: Date
+  capturedAt?: Date | null
+  captureDateSource?: string | null
   userId: number | null
   camera?: {
     id: number
@@ -101,6 +103,8 @@ function toPublicDetection(detection: {
     manualReviewNote: detection.manualReviewNote,
     userId: detection.userId,
     createdAt: detection.createdAt.toISOString(),
+    capturedAt: detection.capturedAt?.toISOString() ?? null,
+    captureDateSource: detection.captureDateSource,
     time: formatRelativeDate(detection.createdAt)
   }
 }
@@ -237,7 +241,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   const [totalFiltered, detections, animalDetections, withoutDetection, speciesDistribution] = await Promise.all([
     prisma.detection.count({ where }),
     prisma.detection.findMany({
-      include: {
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        imagePath: true,
+        species: true,
+        confidence: true,
+        location: true,
+        priority: true,
+        cameraId: true,
+        batchJobId: true,
+        x1: true,
+        y1: true,
+        x2: true,
+        y2: true,
+        manualReviewedAt: true,
+        manualReviewNote: true,
+        createdAt: true,
+        userId: true,
         camera: {
           select: {
             code: true,
@@ -247,7 +268,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           }
         }
       },
-      orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
       where

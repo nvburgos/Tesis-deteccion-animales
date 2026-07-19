@@ -1,4 +1,4 @@
-﻿const { execFile, spawn } = require('node:child_process')
+const { execFile, spawn } = require('node:child_process')
 const { copyFile, mkdir, readdir, rm } = require('node:fs/promises')
 const { existsSync } = require('node:fs')
 const path = require('node:path')
@@ -14,6 +14,25 @@ const speciesNetBatchSize = Number(process.env.SPECIESNET_BATCH_SIZE || 8)
 const batchTimeoutMs = Number(process.env.SPECIESNET_BATCH_TIMEOUT_MS || 0)
 const runOnce = process.argv.includes('--once')
 
+let cachedHasCaptureColumns = null
+
+async function hasDetectionCaptureColumns() {
+  if (cachedHasCaptureColumns !== null) return cachedHasCaptureColumns
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT COUNT(*)::bigint AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'Detection'
+        AND column_name IN ('capturedAt', 'captureDateSource')
+    `
+    cachedHasCaptureColumns = Number(rows[0]?.count ?? 0) === 2
+  } catch (error) {
+    console.error('[batch-worker] No se pudo verificar columnas de captura:', error)
+    cachedHasCaptureColumns = false
+  }
+  return cachedHasCaptureColumns
+}
 function sanitizeFilename(filename) {
   return filename.replace(/[^a-zA-Z0-9.-]/g, '-').toLowerCase()
 }
@@ -107,6 +126,12 @@ async function createDetectionFromPrediction({ batchJobId, cameraId, location, o
   const coordinates = prediction.coordinates || null
 
   const start = performance.now()
+  const hasCaptureColumns = await hasDetectionCaptureColumns()
+  const captureData = hasCaptureColumns ? {
+    capturedAt: prediction.capturedAt ? new Date(prediction.capturedAt) : null,
+    captureDateSource: prediction.captureDateSource || null
+  } : {}
+
   await prisma.detection.create({
     data: {
       batchJobId,
@@ -116,12 +141,14 @@ async function createDetectionFromPrediction({ batchJobId, cameraId, location, o
       location,
       priority,
       species: prediction.species,
+      ...captureData,
       userId: owner.id,
       x1: coordinates?.[0],
       y1: coordinates?.[1],
       x2: coordinates?.[2],
       y2: coordinates?.[3]
-    }
+    },
+    select: { id: true }
   })
 
   return performance.now() - start

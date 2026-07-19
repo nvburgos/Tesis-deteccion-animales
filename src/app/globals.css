@@ -3329,3 +3329,2362 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Batch processing UI refresh */
+.metricsGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metricCard {
+  border-radius: 16px;
+  min-height: 142px;
+  padding: 22px;
+}
+
+.metricCard strong {
+  font-size: 40px;
+  margin-top: 10px;
+}
+
+.metricCard small {
+  color: #52615a;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.metricHeading span:first-child {
+  font-size: 13px;
+  letter-spacing: 0;
+  max-width: 190px;
+  text-transform: none;
+}
+
+.batchUploadPanel,
+.batchProgressCard,
+.batchSummaryPanel,
+.speciesDistributionPanel,
+.batchDetectionsPanel,
+.batchHistoryPanel {
+  border-radius: 16px;
+  transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+}
+
+.batchUploadPanel:hover,
+.batchProgressCard:hover,
+.batchSummaryPanel:hover,
+.speciesDistributionPanel:hover,
+.batchDetectionsPanel:hover,
+.batchHistoryPanel:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.zipDropZone {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(242, 248, 244, 0.92));
+  border-width: 2px;
+  min-height: 250px;
+  position: relative;
+}
+
+.zipDropZone::after {
+  border: 1px solid rgba(0, 68, 49, 0.08);
+  border-radius: 12px;
+  content: '';
+  inset: 10px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.zipDropZone.hasZip {
+  background: #eef8f2;
+  border-color: var(--primary);
+}
+
+.zipDropIcon {
+  box-shadow: 0 10px 22px rgba(0, 68, 49, 0.12);
+}
+
+.batchFileSummary {
+  grid-template-columns: 1.2fr 0.7fr 0.9fr 1fr;
+}
+
+.batchFileSummary strong,
+.batchProgressGrid strong,
+.detectionSidePanel strong {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+.batchProgressTrack {
+  align-items: center;
+  background: #e2ebe6;
+  border-radius: 999px;
+  display: flex;
+  height: 26px;
+  margin-top: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.batchProgressTrack span {
+  background: linear-gradient(90deg, #006b4d, #8ed5b7);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 320ms ease;
+}
+
+.batchProgressTrack strong {
+  color: #103324;
+  font-size: 12px;
+  font-weight: 900;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.progressPercentBadge {
+  background: #e9f8ef;
+  border: 1px solid #b8e6cd;
+  border-radius: 999px;
+  color: var(--primary);
+  display: inline-flex;
+  font-size: 28px !important;
+  padding: 8px 14px;
+}
+
+.batchProgressGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.batchProgressGrid span {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+}
+
+.batchSummaryCard {
+  align-content: center;
+  gap: 12px;
+  min-height: 126px;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.batchSummaryCard:hover,
+.batchHistoryItem:hover,
+.compactDetectionRow:hover {
+  background: #f2f8f5;
+  border-color: var(--primary-muted);
+  transform: translateY(-1px);
+}
+
+.batchSummaryCard strong {
+  order: 1;
+}
+
+.batchSummaryCard > span:not(.metricIcon) {
+  font-size: 13px;
+  letter-spacing: 0;
+  order: 2;
+  text-transform: none;
+}
+
+.batchSummaryCard .metricIcon {
+  order: 0;
+}
+
+.automaticSummaryCard {
+  background: #f8faf9;
+  border: 1px solid #dfe8e2;
+  border-radius: 16px;
+  margin: 0 24px 24px;
+  padding: 18px;
+}
+
+.automaticSummaryCard > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.automaticSummaryCard h3 {
+  color: var(--primary);
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.automaticSummaryCard p {
+  color: #33433b;
+  font-size: 15px;
+  line-height: 1.55;
+  margin-top: 12px;
+}
+
+.speciesDistributionRow {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 14px;
+  padding: 14px;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.speciesDistributionRow:hover {
+  background: #f2f8f5;
+  border-color: var(--primary-muted);
+}
+
+.speciesDistributionMeta {
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.speciesDistributionIcon {
+  align-items: center;
+  background: #e2f4e9;
+  border-radius: 999px;
+  color: var(--primary);
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.speciesDistributionMeta em {
+  color: var(--primary);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.speciesBarTrack {
+  height: 13px;
+}
+
+.compactPanelHeader {
+  align-items: center;
+}
+
+.quickSearchBox {
+  align-items: center;
+  background: #f7f9f8;
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  display: flex;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  width: min(300px, 100%);
+}
+
+.quickSearchBox input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  outline: 0;
+  width: 100%;
+}
+
+.compactTableWrap table td,
+.compactTableWrap table th {
+  padding-bottom: 10px;
+  padding-top: 10px;
+}
+
+.compactThumb {
+  height: 50px;
+  width: 66px;
+}
+
+.compactDetectionRow {
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.batchHistoryCards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.batchHistoryCards .batchHistoryItem {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: 1fr;
+  padding: 16px;
+}
+
+.batchHistoryMain {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.batchHistoryMain > div > span {
+  color: #59645f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.batchHistoryStats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-content: stretch;
+}
+
+.batchHistoryStats span {
+  align-items: center;
+  border-radius: 10px;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-start;
+}
+
+.detectionModalBackdrop {
+  animation: fadeIn 140ms ease;
+  padding: 18px;
+}
+
+.enhancedDetectionModal {
+  animation: modalRise 180ms ease;
+  max-width: min(1500px, calc(100vw - 36px));
+  width: 100%;
+}
+
+.detectionModalHeader p {
+  color: #59645f;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.enhancedDetectionBody {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  padding: 0;
+}
+
+.imageInspectorPanel {
+  background: #0d1712;
+  display: grid;
+  grid-template-rows: auto minmax(420px, 1fr) auto;
+  min-height: min(76vh, 760px);
+}
+
+.imageToolbar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+}
+
+.compactToolButton {
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.imageZoomViewport {
+  align-items: center;
+  cursor: grab;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.imageZoomViewport.dragging {
+  cursor: grabbing;
+}
+
+.imageZoomStage {
+  max-height: 100%;
+  max-width: 100%;
+  position: relative;
+  transform-origin: center center;
+  transition: transform 120ms ease;
+}
+
+.imageZoomViewport.dragging .imageZoomStage {
+  transition: none;
+}
+
+.zoomDetectionImage {
+  display: block;
+  max-height: min(68vh, 680px);
+  max-width: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.enhancedDetectionBox {
+  border: 5px solid #b7f3ce;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px rgba(0, 34, 22, 0.85), 0 12px 28px rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+  position: absolute;
+}
+
+.enhancedDetectionLabel {
+  background: rgba(0, 68, 49, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 10px;
+  color: white;
+  left: 10px;
+  min-width: 96px;
+  padding: 8px 10px;
+  position: absolute;
+  top: -54px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transform-origin: left bottom;
+}
+
+.enhancedDetectionLabel strong,
+.enhancedDetectionLabel span {
+  display: block;
+  line-height: 1.05;
+}
+
+.enhancedDetectionLabel strong {
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.enhancedDetectionLabel span {
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.compactNoDetection {
+  border-radius: 12px;
+}
+
+.imageZoomFooter {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  color: #33433b;
+  display: flex;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+.imageZoomFooter span {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.detectionSidePanel {
+  align-content: start;
+  background: #f8faf9;
+  border-left: 1px solid #e1e7e3;
+  display: grid;
+  gap: 12px;
+  max-height: min(76vh, 760px);
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.detectionSidePanel div {
+  background: white;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.detectionSidePanel span {
+  color: #59645f;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detectionSidePanel strong {
+  color: #17231d;
+  font-size: 15px;
+  line-height: 1.3;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.detectionSidePanel small {
+  color: #59645f;
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 1180px) {
+  .metricsGrid,
+  .batchFileSummary,
+  .batchProgressGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batchHistoryCards {
+    grid-template-columns: 1fr;
+  }
+
+  .enhancedDetectionBody {
+    grid-template-columns: 1fr;
+  }
+
+  .detectionSidePanel {
+    border-left: 0;
+    border-top: 1px solid #e1e7e3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .metricsGrid,
+  .batchFileSummary,
+  .batchProgressGrid,
+  .detectionSidePanel,
+  .speciesDistributionMeta,
+  .batchHistoryStats {
+    grid-template-columns: 1fr;
+  }
+
+  .compactPanelHeader {
+    align-items: stretch;
+  }
+
+  .quickSearchBox {
+    width: 100%;
+  }
+
+  .imageInspectorPanel {
+    grid-template-rows: auto minmax(320px, 58vh) auto;
+    min-height: 0;
+  }
+
+  .enhancedDetectionModal {
+    max-width: calc(100vw - 18px);
+  }
+
+  .detectionModalBackdrop {
+    padding: 9px;
+  }
+}
+
+/* Camera detail historical metrics layout */
+.cameraBatchWorkspace > .metricsGrid {
+  gap: 14px;
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricCard {
+  min-height: 126px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricHeading {
+  gap: 10px;
+  min-height: 40px;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricHeading span:first-child {
+  font-size: 12px;
+  line-height: 1.25;
+  max-width: none;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricIcon {
+  border-radius: 10px;
+  height: 36px;
+  width: 36px;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricIcon svg {
+  height: 20px;
+  width: 20px;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricCard strong {
+  font-size: 32px;
+  margin-top: 8px;
+}
+
+.cameraBatchWorkspace > .metricsGrid .metricCard small {
+  font-size: 12px;
+  line-height: 1.3;
+  margin-top: 7px;
+}
+
+@media (min-width: 640px) {
+  .cameraBatchWorkspace > .metricsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .cameraBatchWorkspace > .metricsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .cameraBatchWorkspace > .metricsGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Compact completed batch header */
+.batchProgressComplete {
+  padding: 18px 20px;
+}
+
+.batchCompleteHeader {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.batchCompleteHeader h2 {
+  color: var(--primary);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.batchCompleteHeader p {
+  color: #4f5a55;
+  font-size: 14px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batchCompleteHeader strong {
+  color: #26302b;
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-top: 6px;
+}
+
+.batchCompleteMeta {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.batchCompleteMeta .progressPercentBadge {
+  font-size: 20px !important;
+  padding: 7px 12px;
+}
+
+@media (max-width: 760px) {
+  .batchCompleteHeader {
+    align-items: flex-start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .batchCompleteMeta {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+/* Species distribution analytics panel */
+.speciesAnalyticsPanel {
+  overflow: visible;
+}
+
+.speciesAnalyticsHeader {
+  border-bottom: 1px solid #e1e7e3;
+}
+
+.speciesAnalyticsHeader p {
+  color: #4f5a55;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.speciesAnalyticsBody {
+  display: grid;
+  grid-template-columns: minmax(280px, 40%) minmax(0, 60%);
+  min-height: 360px;
+}
+
+.speciesAnalyticsLeft {
+  border-right: 1px solid #e1e7e3;
+  display: grid;
+  gap: 16px;
+  padding: 22px 24px 24px;
+}
+
+.speciesDonutWrap {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 270px;
+  position: relative;
+}
+
+.speciesDonutCenter {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.speciesDonutCenter span {
+  color: #52615a;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  max-width: 110px;
+}
+
+.speciesDonutCenter strong {
+  color: var(--primary);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.speciesChartTooltip {
+  background: white;
+  border: 1px solid #dfe8e2;
+  border-radius: 10px;
+  box-shadow: 0 12px 26px rgba(27, 67, 50, 0.12);
+  color: #26302b;
+  display: grid;
+  gap: 3px;
+  max-width: 260px;
+  padding: 10px 12px;
+}
+
+.speciesChartTooltip strong {
+  color: var(--primary);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.speciesChartTooltip span,
+.speciesChartTooltip small {
+  color: #59645f;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.speciesInsightCard {
+  align-items: flex-start;
+  background: #f8faf9;
+  border: 1px solid #dfe8e2;
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 14px;
+}
+
+.speciesInsightIcon {
+  align-items: center;
+  background: #e2f4e9;
+  border-radius: 999px;
+  color: var(--primary);
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.speciesInsightCard p {
+  color: #33433b;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.speciesAnalyticsList {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  padding: 22px 24px 24px;
+}
+
+.speciesAnalyticsRow {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  padding: 13px 14px;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.speciesAnalyticsRow:hover {
+  background: #f2f8f5;
+  border-color: var(--primary-muted);
+  transform: translateY(-1px);
+}
+
+.speciesAnalyticsMeta {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.speciesColorDot {
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 68, 49, 0.12);
+  height: 13px;
+  width: 13px;
+}
+
+.speciesAnalyticsMeta strong {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.speciesAnalyticsMeta span:not(.speciesColorDot) {
+  color: #59645f;
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.speciesAnalyticsMeta em {
+  color: #26302b;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 900;
+  min-width: 42px;
+  text-align: right;
+}
+
+.speciesThinBar {
+  background: #e8eee9;
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+}
+
+.speciesThinBar span {
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 360ms ease;
+}
+
+.speciesAnalyticsEmpty {
+  align-items: center;
+  color: #52615a;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 260px;
+}
+
+@media (max-width: 1024px) {
+  .speciesAnalyticsBody {
+    grid-template-columns: 1fr;
+  }
+
+  .speciesAnalyticsLeft {
+    border-right: 0;
+    border-bottom: 1px solid #e1e7e3;
+  }
+}
+
+@media (max-width: 640px) {
+  .speciesAnalyticsLeft,
+  .speciesAnalyticsList {
+    padding: 18px 16px;
+  }
+
+  .speciesDonutWrap {
+    min-height: 240px;
+  }
+
+  .speciesAnalyticsMeta {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .speciesAnalyticsMeta span:not(.speciesColorDot) {
+    grid-column: 2 / -1;
+    white-space: normal;
+  }
+}
+
+/* Compact species list beside donut chart */
+.speciesAnalyticsList {
+  gap: 0;
+  padding: 14px 24px 18px;
+}
+
+.speciesAnalyticsRow {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #edf1ef;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 6px;
+  padding: 11px 0;
+}
+
+.speciesAnalyticsRow:last-child {
+  border-bottom: 0;
+}
+
+.speciesAnalyticsRow:hover {
+  background: #f7fbf8;
+  border-color: #edf1ef;
+  transform: none;
+}
+
+.speciesAnalyticsMeta {
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.speciesColorDot {
+  height: 11px;
+  width: 11px;
+}
+
+.speciesAnalyticsMeta strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.speciesAnalyticsMeta span:not(.speciesColorDot) {
+  color: #65716c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.speciesAnalyticsMeta em {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+  min-width: 38px;
+}
+
+.speciesThinBar {
+  height: 4px;
+}
+
+@media (max-width: 640px) {
+  .speciesAnalyticsList {
+    padding: 12px 16px 18px;
+  }
+
+  .speciesAnalyticsRow {
+    padding: 11px 0;
+  }
+
+  .speciesAnalyticsMeta {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .speciesAnalyticsMeta span:not(.speciesColorDot) {
+    grid-column: 2 / 3;
+  }
+
+  .speciesAnalyticsMeta em {
+    grid-column: 3 / 4;
+    grid-row: 1 / 3;
+  }
+}
+
+/* Unified upload tabs */
+.uploadTabsModule {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.uploadTabsList {
+  background: #f8faf9;
+  border-bottom: 1px solid #e1e7e3;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 10px 0;
+}
+
+.uploadTab {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: #59645f;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  min-height: 54px;
+  padding: 8px 16px 10px;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.uploadTab:hover {
+  background: #f1f6f3;
+  color: var(--primary);
+}
+
+.uploadTab:focus-visible {
+  outline: 3px solid rgba(142, 213, 183, 0.45);
+  outline-offset: -3px;
+}
+
+.uploadTab.active {
+  background: #edf8f2;
+  border-bottom-color: var(--primary);
+  color: var(--primary);
+}
+
+.uploadTab svg {
+  flex: 0 0 auto;
+}
+
+.uploadTab span,
+.uploadTab strong,
+.uploadTab small {
+  display: block;
+}
+
+.uploadTab strong {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.uploadTab small {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  margin-top: 3px;
+  opacity: 0.78;
+}
+
+.uploadTabsContent {
+  background: white;
+}
+
+.uploadTabPanel[hidden] {
+  display: none;
+}
+
+.uploadTabsModule .batchUploadPanel,
+.uploadTabsModule .individualAnalysisPanel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.uploadTabsModule .batchUploadPanel:hover,
+.uploadTabsModule .individualAnalysisPanel:hover {
+  box-shadow: none;
+}
+
+.uploadTabsModule .inlineIndividualAnalysis .panelHeader {
+  border-bottom: 1px solid #e1e7e3;
+}
+
+.uploadTabsModule .individualAnalysisGrid {
+  border-top: 0;
+}
+
+@media (max-width: 640px) {
+  .uploadTabsList {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .uploadTab {
+    min-height: 50px;
+    padding: 8px 12px 9px;
+  }
+
+  .uploadTab strong {
+    font-size: 13px;
+  }
+
+  .uploadTab small {
+    font-size: 11px;
+  }
+}
+
+/* Camera detail visual hierarchy refresh */
+.cameraBatchWorkspace {
+  gap: 18px;
+}
+
+.batchCompletionBanner {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dfe8e2;
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(31, 45, 38, 0.06);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.batchCompletionMain {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.batchCompletionMain h2 {
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.batchCompletionMain p {
+  color: #5d6862;
+  font-size: 13px;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.batchCompletionMeta {
+  align-items: center;
+  color: #55615b;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.batchCompletionMeta .progressPercentBadge {
+  font-size: 13px;
+  padding: 5px 9px;
+}
+
+.batchCompletionLink {
+  min-height: 34px;
+  padding: 0 11px;
+}
+
+.batchSummaryCompact .panelHeader {
+  padding-bottom: 14px;
+}
+
+.batchSummaryCompactHeader {
+  align-items: center;
+  gap: 12px;
+}
+
+.batchSummaryMetaLine {
+  align-items: center;
+  color: #59645f;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.batchSummaryMetaLine > span:not(.batchStatus) {
+  border-right: 1px solid #dfe8e2;
+  padding-right: 8px;
+}
+
+.batchSummaryGrid {
+  gap: 10px;
+  padding: 0 20px 18px;
+}
+
+.batchSummaryCard {
+  border-radius: 12px;
+  gap: 8px;
+  min-height: 104px;
+  padding: 13px;
+}
+
+.batchSummaryCard:hover {
+  transform: none;
+}
+
+.batchSummaryCard strong {
+  font-size: 26px;
+}
+
+.automaticSummaryCompact {
+  margin: 0 20px 18px;
+  padding: 14px 16px;
+}
+
+.automaticSummaryCompact > div {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+
+.automaticSummaryCompact h3 {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.automaticSummaryCompact ul {
+  color: #47534d;
+  display: grid;
+  font-size: 13px;
+  gap: 5px;
+  line-height: 1.45;
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.speciesAnalyticsLeft {
+  align-content: start;
+  gap: 12px;
+}
+
+.speciesDominantSummary {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  padding: 4px 0 0;
+  text-align: center;
+}
+
+.speciesDominantSummary span {
+  color: #68736e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.speciesDominantSummary strong {
+  color: var(--primary);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.speciesDominantSummary em {
+  color: #26302b;
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.batchFiltersMinimal {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  padding: 0 20px 12px;
+}
+
+.detectionSegment {
+  background: #f3f7f4;
+  border: 1px solid #dfe8e2;
+  border-radius: 10px;
+  display: inline-flex;
+  padding: 3px;
+}
+
+.detectionSegment button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #59645f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 32px;
+  padding: 0 10px;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.detectionSegment button:hover {
+  background: #edf5ef;
+  color: var(--primary);
+}
+
+.detectionSegment button.active {
+  background: #dff4e9;
+  color: var(--primary-container);
+}
+
+.advancedFiltersButton {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.advancedFiltersPanel {
+  background: #fbfdfb;
+  border: 1px solid #e5ece8;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 20px 14px;
+  padding: 12px;
+}
+
+.advancedFiltersPanel label {
+  display: grid;
+  gap: 6px;
+}
+
+.advancedFiltersPanel span {
+  color: #29312e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.advancedFiltersPanel select,
+.advancedFiltersPanel input {
+  background: white;
+  border: 1px solid var(--outline-strong);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.compactTableWrap table th,
+.compactTableWrap table td {
+  padding-bottom: 9px;
+  padding-top: 9px;
+}
+
+.compactDetectionRow {
+  transition: background 160ms ease;
+}
+
+.compactDetectionRow:hover {
+  background: #f7fbf8;
+  transform: none;
+}
+
+.compactThumb {
+  height: 58px;
+  width: 74px;
+}
+
+.ghostTableAction {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--primary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.ghostTableAction:hover {
+  background: #eef7f2;
+  color: var(--primary-container);
+}
+
+.batchHistoryCompactList {
+  gap: 0;
+  padding: 0 20px 18px;
+}
+
+.batchHistoryCompactRow,
+.batchHistoryCards .batchHistoryCompactRow {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #edf1ef;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 1.5fr) auto auto auto auto auto auto;
+  padding: 10px 0;
+}
+
+.batchHistoryCompactRow:last-child {
+  border-bottom: 0;
+}
+
+.batchHistoryCompactRow.active {
+  background: #f7fbf8;
+  border-color: #dce8e1;
+  box-shadow: none;
+}
+
+.batchHistoryCompactRow:hover {
+  background: #f7fbf8;
+  border-color: #edf1ef;
+  transform: none;
+}
+
+.batchHistoryFile {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  min-width: 0;
+}
+
+.batchHistoryFile strong {
+  color: var(--primary);
+  font-size: 14px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batchHistoryCompactRow > span:not(.batchStatus) {
+  color: #59645f;
+  font-size: 13px;
+  font-weight: 750;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.batchHistoryCompactRow .batchHistoryIcon {
+  border-radius: 9px;
+  height: 34px;
+  width: 34px;
+}
+
+@media (max-width: 1100px) {
+  .batchFiltersMinimal {
+    grid-template-columns: 1fr;
+  }
+
+  .detectionSegment {
+    justify-self: start;
+  }
+
+  .advancedFiltersPanel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batchHistoryCompactRow,
+  .batchHistoryCards .batchHistoryCompactRow {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .batchCompletionBanner,
+  .batchCompletionMeta,
+  .batchSummaryCompactHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .batchCompletionBanner {
+    display: grid;
+  }
+
+  .batchCompletionMeta,
+  .batchSummaryMetaLine {
+    justify-content: flex-start;
+  }
+
+  .batchSummaryGrid,
+  .advancedFiltersPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .batchFiltersMinimal {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .detectionSegment {
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .detectionSegment button {
+    flex: 1 0 auto;
+  }
+
+  .batchHistoryCompactRow,
+  .batchHistoryCards .batchHistoryCompactRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Compact completed processing notification */
+.batchCompletionBanner {
+  border-radius: 12px;
+  gap: 12px;
+  padding: 9px 14px;
+}
+
+.batchCompletionMain .resultIcon {
+  height: 34px;
+  width: 34px;
+}
+
+.batchCompletionMain h2 {
+  font-size: 15px;
+}
+
+.batchCompletionMain p {
+  font-size: 12px;
+  margin-top: 1px;
+}
+
+.batchCompletionMeta {
+  gap: 0;
+}
+
+.batchCompletionMeta strong,
+.batchCompletionMeta > span:not(.batchStatus) {
+  color: #47534d;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
+.batchCompletionMeta strong {
+  color: var(--primary);
+  padding-left: 0;
+}
+
+.batchCompletionMeta > span:not(.batchStatus) {
+  border-left: 1px solid #dbe6df;
+}
+
+.batchCompletionMeta .batchStatus {
+  margin-left: 9px;
+}
+
+@media (max-width: 700px) {
+  .batchCompletionMeta {
+    row-gap: 8px;
+  }
+
+  .batchCompletionMeta strong,
+  .batchCompletionMeta > span:not(.batchStatus) {
+    padding-left: 0;
+    padding-right: 8px;
+  }
+}
+
+/* Species analysis module */
+.speciesAnalysisPanel {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  gap: 16px;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.speciesAnalysisHeader {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.speciesAnalysisHeader span {
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.speciesAnalysisHeader h2 {
+  color: #17231d;
+  font-size: 24px;
+  line-height: 1.15;
+  margin-top: 4px;
+}
+
+.speciesAnalysisHeader p {
+  color: #59645f;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.speciesHeaderCamera,
+.speciesLimitation {
+  align-items: center;
+  color: #59645f;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 7px;
+}
+
+.speciesLimitation {
+  background: #f7faf8;
+  border: 1px solid #e3ebe6;
+  border-radius: 12px;
+  display: block;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.speciesAnalysisMetrics,
+.speciesDetailMetrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.speciesAnalysisMetrics article,
+.speciesDetailMetrics article {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.speciesAnalysisMetrics span,
+.speciesDetailMetrics span {
+  color: #65716c;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speciesAnalysisMetrics strong,
+.speciesDetailMetrics strong {
+  color: var(--primary);
+  display: block;
+  font-size: 20px;
+  line-height: 1.15;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.speciesAnalysisControls,
+.speciesAdvancedFilters {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+}
+
+.speciesAnalysisControls select,
+.speciesAdvancedFilters select,
+.speciesAdvancedFilters input {
+  background: white;
+  border: 1px solid var(--outline-strong);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  min-height: 40px;
+  padding: 0 11px;
+}
+
+.speciesSearchBox {
+  width: 100%;
+}
+
+.speciesAdvancedFilters {
+  background: #fbfdfb;
+  border: 1px solid #e5ece8;
+  border-radius: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px;
+}
+
+.speciesAdvancedFilters label {
+  display: grid;
+  gap: 6px;
+}
+
+.speciesAdvancedFilters label span {
+  color: #29312e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.speciesAnalysisLayout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+}
+
+.speciesTablePanel,
+.speciesDetailPanel {
+  border: 1px solid #e1e7e3;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.speciesTableHeader,
+.speciesEvidenceHeader {
+  align-items: center;
+  background: #f8faf9;
+  border-bottom: 1px solid #e1e7e3;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.speciesTableHeader strong,
+.speciesEvidenceHeader strong,
+.dailyActivityPanel > strong {
+  color: #17231d;
+  font-size: 14px;
+}
+
+.speciesTableHeader span,
+.speciesEvidenceHeader span {
+  color: #64716b;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.speciesCompactTable {
+  overflow-x: auto;
+}
+
+.speciesCompactTable table {
+  border-collapse: collapse;
+  min-width: 980px;
+  width: 100%;
+}
+
+.speciesCompactTable th,
+.speciesCompactTable td {
+  border-bottom: 1px solid #edf1ef;
+  color: #47534d;
+  font-size: 13px;
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.speciesCompactTable th {
+  color: #65716c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speciesCompactTable tr.active,
+.speciesCompactTable tr:hover {
+  background: #f7fbf8;
+}
+
+.speciesCompactTable td strong {
+  color: var(--primary);
+  display: block;
+  font-size: 13px;
+}
+
+.speciesCompactTable td small {
+  color: #7a8580;
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.speciesMiniThumb,
+.speciesMiniFallback {
+  border-radius: 9px;
+  display: block;
+  height: 46px;
+  object-fit: cover;
+  width: 58px;
+}
+
+.speciesMiniFallback {
+  align-items: center;
+  background: #e8f3ed;
+  color: var(--primary);
+  display: flex;
+  justify-content: center;
+}
+
+.speciesDetailPanel {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.speciesDetailHeader span {
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.speciesDetailHeader h3 {
+  color: #17231d;
+  font-size: 22px;
+  line-height: 1.15;
+  margin-top: 4px;
+}
+
+.speciesDetailHeader p {
+  color: #65716c;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.speciesDetailMetrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.activityPatternPanel,
+.dailyActivityPanel,
+.speciesEvidencePanel {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.activityPatternPanel > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+.activityPatternPanel p {
+  color: #47534d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rangeBars {
+  display: grid;
+  gap: 8px;
+}
+
+.rangeBars > div {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 82px minmax(0, 1fr) 28px;
+}
+
+.rangeBars span,
+.rangeBars strong {
+  color: #59645f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.rangeBars div div {
+  background: #e4ece7;
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+}
+
+.rangeBars i {
+  background: linear-gradient(90deg, #006b4d, #7ed9ba);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.dailyBars {
+  align-items: end;
+  display: flex;
+  gap: 6px;
+  min-height: 120px;
+  overflow-x: auto;
+}
+
+.dailyBars > div {
+  align-items: center;
+  display: grid;
+  flex: 0 0 28px;
+  gap: 6px;
+  grid-template-rows: 1fr auto;
+  height: 110px;
+  justify-items: center;
+}
+
+.dailyBars i {
+  align-self: end;
+  background: #8ed5b7;
+  border-radius: 6px 6px 0 0;
+  display: block;
+  width: 14px;
+}
+
+.dailyBars span {
+  color: #65716c;
+  font-size: 10px;
+  transform: rotate(-35deg);
+  white-space: nowrap;
+}
+
+.speciesEvidencePanel {
+  padding: 0;
+}
+
+.speciesEvidenceGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 12px;
+}
+
+.speciesEvidenceGrid article {
+  background: white;
+  border: 1px solid #e1e7e3;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.speciesEvidenceGrid img {
+  aspect-ratio: 4 / 3;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.speciesEvidenceGrid article > div {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+}
+
+.speciesEvidenceGrid strong {
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.speciesEvidenceGrid span,
+.speciesEvidenceGrid small {
+  color: #65716c;
+  font-size: 12px;
+}
+
+.compactEvidencePagination {
+  padding: 0 12px 12px;
+}
+
+@media (max-width: 1180px) {
+  .speciesAnalysisLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .speciesAnalysisMetrics,
+  .speciesAdvancedFilters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .speciesAnalysisPanel {
+    padding: 16px;
+  }
+
+  .speciesAnalysisHeader,
+  .speciesAnalysisControls {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .speciesAnalysisHeader {
+    display: grid;
+  }
+
+  .speciesAnalysisMetrics,
+  .speciesAdvancedFilters,
+  .speciesDetailMetrics,
+  .speciesEvidenceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .speciesCompactTable table {
+    min-width: 760px;
+  }
+}
+
+/* Full-width species detail view */
+.speciesDetailFullPage {
+  gap: 16px;
+}
+
+.speciesBackButton {
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.compactLimitation {
+  margin: 0;
+}
+
+.speciesFullHeader {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dfe8e2;
+  border-radius: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 18px;
+}
+
+.speciesFullIdentity {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+}
+
+.speciesRepresentativeThumb,
+.speciesRepresentativeFallback {
+  border-radius: 12px;
+  flex: 0 0 auto;
+  height: 78px;
+  object-fit: cover;
+  width: 96px;
+}
+
+.speciesRepresentativeFallback {
+  align-items: center;
+  background: #e8f3ed;
+  color: var(--primary);
+  display: flex;
+  justify-content: center;
+}
+
+.speciesFullIdentity span {
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.speciesFullIdentity h2 {
+  color: #17231d;
+  font-size: 30px;
+  line-height: 1.1;
+  margin-top: 4px;
+}
+
+.speciesFullIdentity p {
+  color: #64716b;
+  font-size: 13px;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.speciesFullMeta {
+  color: #59645f;
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  text-align: right;
+}
+
+.speciesFullMeta strong {
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.speciesFullMeta span {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.speciesFullMetrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.speciesFullMetrics article {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.speciesFullMetrics span {
+  color: #65716c;
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.speciesFullMetrics strong {
+  color: #17231d;
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+}
+
+.speciesChartsGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.speciesChartCard {
+  background: #ffffff;
+  border: 1px solid #dfe8e2;
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  min-height: 310px;
+  padding: 16px;
+}
+
+.speciesChartHeader {
+  align-items: center;
+  color: #17231d;
+  display: flex;
+  gap: 8px;
+}
+
+.speciesChartHeader strong {
+  font-size: 16px;
+}
+
+.fullRangeBars {
+  gap: 13px;
+}
+
+.fullRangeBars > div {
+  grid-template-columns: 96px minmax(0, 1fr) 36px;
+}
+
+.fullRangeBars div div {
+  height: 11px;
+}
+
+.fullDailyBars {
+  min-height: 230px;
+  padding: 8px 4px 0;
+}
+
+.fullDailyBars > div {
+  flex-basis: 34px;
+  height: 210px;
+}
+
+.fullDailyBars i {
+  background: linear-gradient(180deg, #7ed9ba, #006b4d);
+  width: 18px;
+}
+
+.emptyChartText {
+  align-self: center;
+  color: #64716b;
+  font-size: 13px;
+}
+
+.speciesActivityConclusion {
+  color: #33433b;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0;
+  padding: 0 4px;
+}
+
+.speciesEvidenceFullPanel {
+  background: #ffffff;
+  border: 1px solid #dfe8e2;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.speciesEvidenceFullGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 14px;
+}
+
+.speciesEvidenceFullGrid article {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.speciesEvidenceFullGrid img {
+  aspect-ratio: 4 / 3;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.speciesEvidenceFullGrid article > div {
+  display: grid;
+  gap: 6px;
+  padding: 11px;
+}
+
+.speciesEvidenceFullGrid strong {
+  color: #17231d;
+  font-size: 14px;
+}
+
+.speciesEvidenceFullGrid span,
+.speciesEvidenceFullGrid small {
+  color: #64716b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.evidenceImageButton {
+  justify-content: center;
+  margin-top: 4px;
+  min-height: 34px;
+}
+
+.speciesTableFullPanel {
+  width: 100%;
+}
+
+@media (max-width: 1280px) {
+  .speciesFullMetrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .speciesEvidenceFullGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .speciesFullHeader,
+  .speciesChartsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .speciesFullMeta {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .speciesFullMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .speciesEvidenceFullGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .speciesFullIdentity {
+    align-items: flex-start;
+    display: grid;
+  }
+
+  .speciesFullIdentity h2 {
+    font-size: 24px;
+  }
+
+  .speciesFullMetrics,
+  .speciesEvidenceFullGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .speciesChartCard {
+    min-height: 260px;
+  }
+
+  .fullDailyBars {
+    min-height: 190px;
+  }
+}

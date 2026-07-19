@@ -283,10 +283,17 @@ def load_yolo_model(model_path):
     return YOLO(model_path)
 
 
+def with_capture_datetime(image_path, result):
+    captured_at, capture_date_source = extract_capture_datetime(image_path)
+    result.setdefault("capturedAt", captured_at)
+    result.setdefault("captureDateSource", capture_date_source)
+    return result
+
+
 def predict(image_path):
     if env_flag("SPECIESNET_ENABLED", True):
         try:
-            return run_speciesnet(image_path)
+            return with_capture_datetime(image_path, run_speciesnet(image_path))
         except Exception as error:
             print(f"SpeciesNet failed, trying fallback flow: {error}", file=sys.stderr)
 
@@ -295,17 +302,17 @@ def predict(image_path):
             detection = detect_animal_with_megadetector(image_path)
         except RuntimeError as error:
             print(f"Warning: {error}. Falling back to YOLO direct.", file=sys.stderr)
-            return classify_species_with_yolo(image_path)
+            return with_capture_datetime(image_path, classify_species_with_yolo(image_path))
 
         if not detection["animalDetected"]:
-            return {
+            return with_capture_datetime(image_path, {
                 "species": "Sin deteccion",
                 "confidence": 0,
                 "coordinates": None,
                 "animalDetected": False,
                 "detector": detection["detector"],
                 "message": "MegaDetector no encontro animales en la imagen.",
-            }
+            })
 
         species_result = classify_species_with_yolo(image_path)
         species_result["animalDetected"] = True
@@ -318,9 +325,9 @@ def predict(image_path):
             species_result["confidence"] = detection["confidence"]
             species_result["message"] = "Se detecto un animal, pero el clasificador no identifico una especie configurada."
 
-        return species_result
+        return with_capture_datetime(image_path, species_result)
 
-    return classify_species_with_yolo(image_path)
+    return with_capture_datetime(image_path, classify_species_with_yolo(image_path))
 
 
 def main():

@@ -13,28 +13,38 @@ function formatDate(value: string) {
   return new Date(value).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function formatDuration(job: BatchJob) {
+  if (!job.completedAt) {
+    return '-'
+  }
+
+  const seconds = Math.max(0, Math.round((new Date(job.completedAt).getTime() - new Date(job.createdAt).getTime()) / 1000))
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return minutes > 0 ? `${minutes} min ${remainingSeconds} s` : `${remainingSeconds} s`
+}
+
 export default function BatchHistory({ jobs, onSelect, selectedBatchId }: BatchHistoryProps) {
   return (
     <section className="batchHistoryPanel" aria-label="Historial de lotes">
-      <div className="panelHeader">
+      <div className="panelHeader compactPanelHeader">
         <h2>Historial de lotes</h2>
       </div>
 
-      <div className="batchHistoryList">
+      <div className="batchHistoryList batchHistoryCompactList">
         {jobs.length > 0 ? (
           jobs.map((job) => (
-            <article className={job.id === selectedBatchId ? 'batchHistoryItem active' : 'batchHistoryItem'} key={job.id}>
-              <span className="batchHistoryIcon"><FileArchive size={20} /></span>
-              <div>
+            <article className={job.id === selectedBatchId ? 'batchHistoryItem batchHistoryCompactRow active' : 'batchHistoryItem batchHistoryCompactRow'} key={job.id}>
+              <div className="batchHistoryFile">
+                <span className="batchHistoryIcon"><FileArchive size={17} /></span>
                 <strong>{job.zipName}</strong>
-                <span>{formatDate(job.createdAt)}</span>
               </div>
-              <div className="batchHistoryStats">
-                <span>{job.processedImages}/{job.totalImages} imagenes</span>
-                <span>{job.failedImages} fallidas</span>
-                <span>{job.status}</span>
-              </div>
-              <button className="secondaryButton" onClick={() => onSelect(job)} type="button">
+              <span className="batchStatus">{job.status}</span>
+              <span>{job.processedImages.toLocaleString('es-ES')}/{job.totalImages.toLocaleString('es-ES')} imagenes</span>
+              <span>{(job.detectionsFound ?? 0).toLocaleString('es-ES')} detecciones</span>
+              <span>{formatDuration(job)}</span>
+              <span>{formatDate(job.createdAt)}</span>
+              <button className="ghostTableAction" onClick={() => onSelect(job)} type="button">
                 Ver resultados
               </button>
             </article>

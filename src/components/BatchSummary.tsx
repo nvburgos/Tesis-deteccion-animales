@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { CalendarClock, CheckCircle2, FileArchive, Images, PawPrint, SearchX, TriangleAlert } from 'lucide-react'
+import { CheckCircle2, Images, PawPrint, SearchX, TriangleAlert } from 'lucide-react'
 import type { BatchJob, Camera } from './dashboardTypes'
 
 export type SpeciesDistributionItem = {
@@ -29,24 +29,12 @@ export type BatchSummaryData = {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function formatDuration(durationMs: number | null) {
-  if (durationMs === null) {
-    return '-'
-  }
-
-  const seconds = Math.max(0, Math.round(durationMs / 1000))
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-
-  return minutes > 0 ? `${minutes} min ${remainingSeconds} s` : `${remainingSeconds} s`
+  return new Date(value).toLocaleString('es-ES', { dateStyle: 'medium' })
 }
 
 const cards = [
   { key: 'processedImages', label: 'Imagenes procesadas', icon: Images },
-  { key: 'animalDetections', label: 'Detecciones con animal', icon: PawPrint },
+  { key: 'animalDetections', label: 'Detecciones con fauna', icon: PawPrint },
   { key: 'withoutDetection', label: 'Imagenes sin deteccion', icon: SearchX },
   { key: 'distinctSpecies', label: 'Especies distintas', icon: CheckCircle2 },
   { key: 'failedImages', label: 'Imagenes fallidas', icon: TriangleAlert }
@@ -55,7 +43,7 @@ const cards = [
 export default function BatchSummary({ job, summary }: { job: BatchJob | null; summary: BatchSummaryData | null }) {
   if (!job) {
     return (
-      <section className="batchSummaryPanel">
+      <section className="batchSummaryPanel" id="batch-summary">
         <div className="panelHeader">
           <h2>Resumen del lote</h2>
         </div>
@@ -66,13 +54,12 @@ export default function BatchSummary({ job, summary }: { job: BatchJob | null; s
 
   if (!summary) {
     return (
-      <section className="batchSummaryPanel" aria-label="Resumen del lote">
+      <section className="batchSummaryPanel" id="batch-summary" aria-label="Resumen del lote">
         <div className="panelHeader">
           <div>
             <h2>Resumen del lote</h2>
             <p>{job.zipName}</p>
           </div>
-          <span className="batchStatus">{job.status}</span>
         </div>
         <div className="emptyState">Preparando resumen del lote...</div>
       </section>
@@ -80,31 +67,11 @@ export default function BatchSummary({ job, summary }: { job: BatchJob | null; s
   }
 
   return (
-    <section className="batchSummaryPanel" aria-label="Resumen del lote">
-      <div className="panelHeader">
+    <section className="batchSummaryPanel batchSummaryCompact" id="batch-summary" aria-label="Resumen del lote">
+      <div className="panelHeader batchSummaryCompactHeader">
         <div>
           <h2>Resumen del lote</h2>
-          <p>{summary.zipName}</p>
-        </div>
-        <span className="batchStatus">{summary.status}</span>
-      </div>
-
-      <div className="batchIdentity">
-        <div>
-          <FileArchive size={18} />
-          <span>{summary.zipName}</span>
-        </div>
-        <div>
-          <PawPrint size={18} />
-          <span>{summary.camera ? `${summary.camera.name} Â· ${summary.camera.code}` : 'Camara no asociada'}</span>
-        </div>
-        <div>
-          <CalendarClock size={18} />
-          <span>{formatDate(summary.createdAt)}</span>
-        </div>
-        <div>
-          <span>Duracion</span>
-          <strong>{formatDuration(summary.durationMs)}</strong>
+          <p>{summary.zipName} {'\u00b7'} {formatDate(summary.createdAt)}</p>
         </div>
       </div>
 
@@ -116,8 +83,8 @@ export default function BatchSummary({ job, summary }: { job: BatchJob | null; s
           return (
             <article className="batchSummaryCard" key={card.key}>
               <span className="metricIcon"><Icon size={21} /></span>
-              <span>{card.label}</span>
               <strong>{value.toLocaleString('es-ES')}</strong>
+              <span>{card.label}</span>
             </article>
           )
         })}
@@ -125,5 +92,4 @@ export default function BatchSummary({ job, summary }: { job: BatchJob | null; s
     </section>
   )
 }
-
 
