@@ -1,7 +1,5 @@
 ﻿'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 import DetectionResult from './DetectionResult'
 import UploadImage from './UploadImage'
 import type { DetectionResultData, Language } from './dashboardTypes'
@@ -28,29 +26,27 @@ export default function IndividualAnalysisPanel({
   result: DetectionResultData | null
   text: UiText
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-
   return (
-    <section className="individualAnalysisPanel">
-      <button className="individualToggle" onClick={() => setIsOpen((current) => !current)} type="button">
-        <span>Analizar imagen individual</span>
-        {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-      </button>
-
-      {isOpen ? (
-        <div className="individualAnalysisGrid">
-          <UploadImage
-            analysisProgress={analysisProgress}
-            fileName={fileName}
-            imagePreview={imagePreview}
-            isAnalyzing={isAnalyzing}
-            text={text}
-            onAnalyze={onAnalyze}
-            onFileSelected={onFileSelected}
-          />
-          <DetectionResult language={language} result={result} text={text} />
+    <section className="individualAnalysisPanel inlineIndividualAnalysis" aria-label="Analizar imagen individual">
+      <div className="panelHeader individualAnalysisHeader">
+        <div>
+          <h2>Analizar imagen individual</h2>
+          <p>Carga una imagen JPG o PNG para ejecutar un analisis individual.</p>
         </div>
-      ) : null}
+      </div>
+
+      <div className="individualAnalysisGrid">
+        <UploadImage
+          analysisProgress={analysisProgress}
+          fileName={fileName}
+          imagePreview={imagePreview}
+          isAnalyzing={isAnalyzing}
+          text={text}
+          onAnalyze={onAnalyze}
+          onFileSelected={onFileSelected}
+        />
+        <DetectionResult language={language} result={result} text={text} />
+      </div>
     </section>
   )
 }

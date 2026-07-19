@@ -1,4 +1,4 @@
-﻿import { execFile } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import sharp from 'sharp'
 import { calculatePriority } from '@/lib/detections'
 import { prisma } from '@/lib/prisma'
+import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 
 const execFileAsync = promisify(execFile)
 const defaultMaxImageDimension = 1280
@@ -19,6 +20,8 @@ export type PredictionResult = {
   warning?: string
   model?: string
   rawLabel?: string
+  capturedAt?: string | null
+  captureDateSource?: string | null
 }
 
 export type BatchPredictionResult = {
@@ -190,6 +193,12 @@ export async function createDetectionFromPrediction({
   const priority = calculatePriority(prediction.species, prediction.confidence)
   const coordinates = prediction.coordinates ?? null
 
+  const hasCaptureColumns = await hasDetectionCaptureColumns()
+  const captureData = hasCaptureColumns ? {
+    capturedAt: prediction.capturedAt ? new Date(prediction.capturedAt) : null,
+    captureDateSource: prediction.captureDateSource ?? null
+  } : {}
+
   const detection = await prisma.detection.create({
     data: {
       batchJobId,
@@ -199,11 +208,22 @@ export async function createDetectionFromPrediction({
       location,
       priority,
       species: prediction.species,
+      ...captureData,
       userId: owner.id,
       x1: coordinates?.[0],
       y1: coordinates?.[1],
       x2: coordinates?.[2],
       y2: coordinates?.[3]
+    },
+    select: {
+      confidence: true,
+      createdAt: true,
+      ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
+      cameraId: true,
+      imagePath: true,
+      location: true,
+      priority: true,
+      species: true
     }
   })
 
@@ -211,6 +231,8 @@ export async function createDetectionFromPrediction({
     confidence: detection.confidence,
     coordinates,
     createdAt: detection.createdAt.toISOString(),
+    capturedAt: detection.capturedAt?.toISOString() ?? null,
+    captureDateSource: detection.captureDateSource,
     cameraId: detection.cameraId,
     imagePath: detection.imagePath,
     location: detection.location,

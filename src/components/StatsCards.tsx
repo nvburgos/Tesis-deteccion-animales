@@ -1,11 +1,17 @@
 'use client'
 
-import { ChartNoAxesColumn, Goal, Microscope, ScanSearch, type LucideIcon } from 'lucide-react'
+import { ChartNoAxesColumn, FileArchive, Goal, Images, Microscope, PawPrint, ScanSearch, type LucideIcon } from 'lucide-react'
 import { uiText, type UiText } from '@/lib/i18n'
 import type { DashboardMetric } from './dashboardTypes'
 
 const metricIcons: Record<string, LucideIcon> = {
-  'Imagenes analizadas': ChartNoAxesColumn,
+  'Lotes procesados': FileArchive,
+  'Im\u00e1genes analizadas': Images,
+  'Imagenes analizadas': Images,
+  Detecciones: PawPrint,
+  'Especies registradas': Microscope,
+  'Im\u00e1genes sin detecci\u00f3n': ScanSearch,
+  'Imagenes sin deteccion': ScanSearch,
   'Total de imagenes analizadas': ChartNoAxesColumn,
   'Analyzed images': ChartNoAxesColumn,
   'Total analyzed images': ChartNoAxesColumn,

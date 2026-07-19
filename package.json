@@ -1,33 +1,34 @@
 {
-    "name":  "wildlife-ai-ui",
-    "version":  "1.0.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev",
-                    "build":  "next build",
-                    "start":  "next start",
-                    "typecheck":  "tsc --noEmit",
-                    "prisma:generate":  "prisma generate",
-                    "prisma:migrate":  "prisma migrate dev",
-                    "prisma:studio":  "prisma studio",
-                    "prepare:dataset":  ".venv\\Scripts\\python.exe python\\prepare_dataset.py",
-                    "train:yolo":  ".venv\\Scripts\\python.exe python\\train.py",
-                    "predict:yolo":  ".venv\\Scripts\\python.exe python\\predict.py",
-                    "worker:batches":  "node scripts/batch-worker.js"
-                },
-    "dependencies":  {
-                         "@prisma/client":  "^6.19.3",
-                         "lucide-react":  "latest",
-                         "next":  "latest",
-                         "prisma":  "^6.19.3",
-                         "react":  "latest",
-                         "react-dom":  "latest",
-                         "sharp":  "^0.34.5"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "latest",
-                            "@types/react":  "latest",
-                            "@types/react-dom":  "latest",
-                            "typescript":  "latest"
-                        }
+    "name": "wildlife-ai-ui",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "typecheck": "tsc --noEmit",
+        "prisma:generate": "prisma generate",
+        "prisma:migrate": "prisma migrate dev",
+        "prisma:studio": "prisma studio",
+        "prepare:dataset": ".venv\\Scripts\\python.exe python\\prepare_dataset.py",
+        "train:yolo": ".venv\\Scripts\\python.exe python\\train.py",
+        "predict:yolo": ".venv\\Scripts\\python.exe python\\predict.py",
+        "worker:batches": "node scripts/batch-worker.js"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.19.3",
+        "lucide-react": "latest",
+        "next": "latest",
+        "prisma": "^6.19.3",
+        "react": "latest",
+        "react-dom": "latest",
+        "recharts": "^3.9.2",
+        "sharp": "^0.34.5"
+    },
+    "devDependencies": {
+        "@types/node": "latest",
+        "@types/react": "latest",
+        "@types/react-dom": "latest",
+        "typescript": "latest"
+    }
 }

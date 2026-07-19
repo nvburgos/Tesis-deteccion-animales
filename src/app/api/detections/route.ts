@@ -1,10 +1,11 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import type { Prisma } from '@prisma/client'
 import { seedDetectionsIfEmpty } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
 import { calculatePriority, formatRelativeDate, normalizeSpecies } from '@/lib/detections'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
+import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,8 @@ function toPublicDetection(detection: {
   manualReviewedAt: Date | null
   manualReviewNote: string | null
   createdAt: Date
+  capturedAt?: Date | null
+  captureDateSource?: string | null
   userId: number | null
   camera?: {
     id: number
@@ -57,6 +60,8 @@ function toPublicDetection(detection: {
     researcher: detection.user?.name ?? 'Sin investigador',
     researcherEmail: detection.user?.email ?? null,
     createdAt: detection.createdAt.toISOString(),
+    capturedAt: detection.capturedAt?.toISOString() ?? null,
+    captureDateSource: detection.captureDateSource ?? null,
     time: formatRelativeDate(detection.createdAt)
   }
 }
@@ -80,6 +85,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Sesion invalida' }, { status: 401 })
   }
 
+  const hasCaptureColumns = await hasDetectionCaptureColumns()
   const searchParams = request.nextUrl.searchParams
   const speciesFilter = searchParams.get('species')?.trim()
   const dateFilter = searchParams.get('date')?.trim()
@@ -115,7 +121,25 @@ export async function GET(request: NextRequest) {
 
   const detections = await prisma.detection.findMany({
     where,
-    include: {
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      imagePath: true,
+      species: true,
+      confidence: true,
+      location: true,
+      priority: true,
+      cameraId: true,
+      batchJobId: true,
+      x1: true,
+      y1: true,
+      x2: true,
+      y2: true,
+      manualReviewedAt: true,
+      manualReviewNote: true,
+      createdAt: true,
+      userId: true,
+      ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
       camera: {
         select: {
           code: true,
@@ -132,7 +156,6 @@ export async function GET(request: NextRequest) {
         }
       }
     },
-    orderBy: { createdAt: 'desc' },
     ...(limit === 'all' ? {} : { take: 20 })
   })
 
@@ -245,6 +268,7 @@ export async function PATCH(request: NextRequest) {
       ? 'Revision manual'
       : calculatePriority(reviewedSpecies, Math.max(detection.confidence, 1))
 
+  const hasCaptureColumns = await hasDetectionCaptureColumns()
   const updatedDetection = await prisma.detection.update({
     where: { id: detectionId },
     data: {
@@ -253,7 +277,24 @@ export async function PATCH(request: NextRequest) {
       priority: reviewedPriority,
       species: reviewedSpecies
     },
-    include: {
+    select: {
+      id: true,
+      imagePath: true,
+      species: true,
+      confidence: true,
+      location: true,
+      priority: true,
+      cameraId: true,
+      batchJobId: true,
+      x1: true,
+      y1: true,
+      x2: true,
+      y2: true,
+      manualReviewedAt: true,
+      manualReviewNote: true,
+      createdAt: true,
+      userId: true,
+      ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
       camera: {
         select: {
           code: true,
