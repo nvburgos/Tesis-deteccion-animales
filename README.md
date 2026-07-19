@@ -875,3 +875,157 @@ Archivos modificados:
 - `README.md`
 
 Estado: preparacion funcional. `wildlife_classes.yaml` define jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma. `prepare_dataset.py` valida datasets reales en `datasets_raw` antes de generar `python/dataset/data.yaml`. No se entreno el modelo, no se borro `python/best.pt` y no se elimino el dataset actual de leopard.
+
+## Flujo por camaras trampa
+
+WildlifeAI organiza ahora las imagenes por **camara trampa** antes de iniciar el analisis. Las camaras representan el origen de las imagenes capturadas; no son dispositivos conectados en tiempo real dentro del sistema.
+
+El sistema no muestra ni gestiona datos operativos de hardware como bateria, senal, temperatura, estado en linea o transmision en vivo. Cada camara funciona como una entidad de organizacion para asociar cargas, lotes, detecciones, estadisticas, reportes e historial.
+
+Flujo principal actualizado:
+
+```text
+Usuario
+  -> ingresa al Panel de Control
+  -> selecciona una camara trampa
+  -> carga imagen individual o ZIP asociado a esa camara
+  -> ejecuta analisis con SpeciesNet / fallback IA
+  -> consulta resultado, lotes, detecciones recientes, historial y reportes filtrados por camara
+```
+
+Rutas principales del flujo:
+
+```text
+/cameras        -> listado de camaras trampa
+/cameras/[id]   -> detalle operativo de una camara
+```
+
+Las camaras se almacenan exclusivamente en PostgreSQL mediante Prisma. No existe un seed, arreglo, mock o archivo JSON con camaras predefinidas; si la tabla no contiene registros activos, `/cameras` muestra el estado vacio y permite crear la primera camara desde la interfaz.
+
+CRUD de camaras:
+
+```text
+GET /api/cameras          -> lista camaras activas
+POST /api/cameras         -> crea una camara
+GET /api/cameras/[id]     -> obtiene una camara activa
+PATCH /api/cameras/[id]   -> actualiza una camara
+DELETE /api/cameras/[id]  -> eliminacion logica con active = false
+```
+
+Endpoints actualizados para `cameraId`:
+
+```text
+POST /api/analyze       -> requiere cameraId y guarda Detection.cameraId
+GET /api/detections     -> acepta cameraId para filtrar
+POST /api/batches       -> requiere cameraId y guarda BatchJob.cameraId
+GET /api/batches        -> acepta cameraId para filtrar
+```
+
+Modelo Prisma agregado:
+
+```prisma
+model Camera {
+  id          Int         @id @default(autoincrement())
+  code        String      @unique
+  name        String
+  zone        String
+  description String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  detections  Detection[]
+  batchJobs   BatchJob[]
+}
+```
+
+`Detection.cameraId` y `BatchJob.cameraId` son opcionales temporalmente para conservar registros existentes sin camara asociada. Para migrar datos antiguos despues, se debe elegir una camara destino por lote o por deteccion y actualizar esos registros con un script o consulta controlada; no se deben reasignar automaticamente sin validacion del usuario.
+
+### 2026-07-18
+
+Cambio: Reorganizacion del flujo principal por camaras trampa. Se agrego el modelo `Camera`, relaciones opcionales en `Detection` y `BatchJob`, endpoints de camaras, rutas `/cameras` y `/cameras/[id]`, tarjetas de camaras y detalle operativo filtrado por camara.
+
+Archivos modificados:
+
+- `prisma/schema.prisma`
+- `prisma/migrations/20260718000000_add_cameras/migration.sql`
+- `src/lib/database.ts`
+- `src/lib/predictionRunner.ts`
+- `src/app/api/cameras/route.ts`
+- `src/app/api/cameras/[id]/route.ts`
+- `src/app/api/analyze/route.ts`
+- `src/app/api/batches/route.ts`
+- `src/app/api/detections/route.ts`
+- `src/app/cameras/page.tsx`
+- `src/app/cameras/[id]/page.tsx`
+- `src/app/page.tsx`
+- `src/app/historial/page.tsx`
+- `src/app/estadisticas/page.tsx`
+- `src/components/CamerasPanel.tsx`
+- `src/components/CameraCard.tsx`
+- `src/components/CameraDetail.tsx`
+- `src/components/RecentDetections.tsx`
+- `src/components/ReportsPanel.tsx`
+- `src/components/Sidebar.tsx`
+- `src/components/dashboardTypes.ts`
+- `src/app/globals.css`
+- `README.md`
+
+Estado: pendiente de aplicar migracion en PostgreSQL. La migracion es no destructiva y conserva datos existentes dejando `cameraId` opcional.
+
+
+## Procesamiento de lotes en segundo plano
+
+El procesamiento de archivos ZIP se separo en dos responsabilidades:
+
+```text
+Next.js
+  -> POST /api/batches
+  -> valida ZIP, camara y sesion
+  -> crea BatchJob en PostgreSQL con status Pendiente
+  -> guarda el ZIP en public/uploads/batches/{batchId}/
+  -> calcula totalImages leyendo las entradas del ZIP cuando es posible
+  -> responde inmediatamente con batchId, status y totalImages
+
+Worker local
+  -> npm run worker:batches
+  -> busca BatchJob con status Pendiente
+  -> reclama el lote con updateMany(id + status Pendiente)
+  -> cambia status a Procesando
+  -> extrae el ZIP
+  -> procesa cada imagen con el flujo SpeciesNet existente
+  -> guarda Detection con cameraId y batchJobId
+  -> actualiza processedImages y failedImages durante el procesamiento
+  -> marca Completado o Con errores y registra completedAt
+```
+
+Comandos de ejecucion local:
+
+```bash
+npm run dev
+npm run worker:batches
+```
+
+`npm run dev` inicia la aplicacion Next.js. `npm run worker:batches` debe permanecer activo en otra terminal para procesar los lotes pendientes. Para pruebas controladas puede ejecutarse una sola iteracion con:
+
+```bash
+npm run worker:batches -- --once
+```
+
+El progreso se consulta desde:
+
+```text
+GET /api/batches/[id]
+```
+
+La respuesta incluye `totalImages`, `processedImages`, `failedImages`, `pendingImages`, `percentage`, `detectionsFound`, `createdAt` y `completedAt`. La interfaz consulta este endpoint cada 3 segundos desde `BatchProgress.tsx` hasta que el lote queda en `Completado`, `Con errores` o `Fallido`.
+
+El worker evita procesar dos veces el mismo lote usando una actualizacion atomica:
+
+```ts
+updateMany({
+  where: { id: pendingJob.id, status: 'Pendiente' },
+  data: { status: 'Procesando' }
+})
+```
+
+Si `count` no es `1`, el lote ya fue tomado por otro proceso y el worker no lo procesa.

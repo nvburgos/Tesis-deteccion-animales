@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -17,7 +17,7 @@ const navItems: { labelKey: keyof UiText; icon: typeof Grid2X2; view: DashboardV
 ]
 
 const routeItems = [
-  { href: '/', label: 'Panel de Control', icon: Grid2X2 },
+  { href: '/cameras', label: 'Panel de Control', icon: Grid2X2 },
   { href: '/historial', label: 'Historial', icon: FileText },
   { href: '/estadisticas', label: 'Estadisticas', icon: PawPrint }
 ]
@@ -44,7 +44,7 @@ export default function Sidebar({ activeView, onViewChange, text = uiText.es }: 
   }, [])
 
   const visibleRouteItems = isAdmin ? [...routeItems, adminRouteItem] : routeItems
-  const secondaryRouteItems = visibleRouteItems.filter((item) => item.href !== '/')
+  const secondaryRouteItems = visibleRouteItems.filter((item) => item.href !== '/cameras')
 
   return (
     <aside className="sidebar" aria-label="Navegacion principal">
@@ -79,7 +79,7 @@ export default function Sidebar({ activeView, onViewChange, text = uiText.es }: 
 
             {secondaryRouteItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
+              const isActive = item.href === '/cameras' ? pathname === item.href || pathname.startsWith('/cameras/') : pathname === item.href
 
               return (
                 <Link className={isActive ? 'navItem active' : 'navItem'} href={item.href} key={item.href}>
@@ -92,7 +92,7 @@ export default function Sidebar({ activeView, onViewChange, text = uiText.es }: 
         ) : (
           visibleRouteItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
+              const isActive = item.href === '/cameras' ? pathname === item.href || pathname.startsWith('/cameras/') : pathname === item.href
 
               return (
                 <Link className={isActive ? 'navItem active' : 'navItem'} href={item.href} key={item.href}>
@@ -114,3 +114,5 @@ export default function Sidebar({ activeView, onViewChange, text = uiText.es }: 
     </aside>
   )
 }
+
+

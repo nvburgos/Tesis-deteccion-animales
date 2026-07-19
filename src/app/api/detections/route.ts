@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import type { Prisma } from '@prisma/client'
 import { seedDetectionsIfEmpty } from '@/lib/database'
@@ -15,6 +15,8 @@ function toPublicDetection(detection: {
   confidence: number
   location: string
   priority: string
+  cameraId: number | null
+  batchJobId: number | null
   x1: number | null
   y1: number | null
   x2: number | null
@@ -23,6 +25,12 @@ function toPublicDetection(detection: {
   manualReviewNote: string | null
   createdAt: Date
   userId: number | null
+  camera?: {
+    id: number
+    code: string
+    name: string
+    zone: string
+  } | null
   user?: {
     id: number
     name: string
@@ -36,6 +44,9 @@ function toPublicDetection(detection: {
     confidence: Math.round(detection.confidence),
     location: detection.location,
     priority: detection.priority,
+    cameraId: detection.cameraId,
+    batchJobId: detection.batchJobId,
+    camera: detection.camera ?? null,
     x1: detection.x1,
     y1: detection.y1,
     x2: detection.x2,
@@ -73,12 +84,22 @@ export async function GET(request: NextRequest) {
   const speciesFilter = searchParams.get('species')?.trim()
   const dateFilter = searchParams.get('date')?.trim()
   const researcherFilter = Number(searchParams.get('researcherId') ?? '')
+  const cameraFilter = Number(searchParams.get('cameraId') ?? '')
+  const batchJobFilter = Number(searchParams.get('batchJobId') ?? '')
   const limit = searchParams.get('limit')
   const isAdmin = isAdminRole(currentUser.role)
   const where: Prisma.DetectionWhereInput = isAdmin ? {} : { userId: currentUser.id }
 
   if (isAdmin && Number.isInteger(researcherFilter) && researcherFilter > 0) {
     where.userId = researcherFilter
+  }
+
+  if (Number.isInteger(cameraFilter) && cameraFilter > 0) {
+    where.cameraId = cameraFilter
+  }
+
+  if (Number.isInteger(batchJobFilter) && batchJobFilter > 0) {
+    where.batchJobId = batchJobFilter
   }
 
   if (speciesFilter) {
@@ -95,6 +116,14 @@ export async function GET(request: NextRequest) {
   const detections = await prisma.detection.findMany({
     where,
     include: {
+      camera: {
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          zone: true
+        }
+      },
       user: {
         select: {
           email: true,
@@ -225,6 +254,14 @@ export async function PATCH(request: NextRequest) {
       species: reviewedSpecies
     },
     include: {
+      camera: {
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          zone: true
+        }
+      },
       user: {
         select: {
           email: true,

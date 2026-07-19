@@ -2,6 +2,23 @@ import type { Language } from '@/lib/i18n'
 
 export type Priority = 'Normal' | 'Alta prioridad' | 'Revision manual'
 
+export type Camera = {
+  id: number
+  code: string
+  name: string
+  zone: string
+  description: string | null
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type CameraSummary = Camera & {
+  lastUploadAt: string | null
+  totalImagesProcessed: number
+  totalSpeciesDetected: number
+}
+
 export type DetectionResultData = {
   species: string | null
   confidence: number
@@ -11,6 +28,9 @@ export type DetectionResultData = {
   imagePath?: string
   location?: string
   createdAt?: string
+  cameraId?: number | null
+  batchJobId?: number | null
+  camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
 }
 
 export type RecentDetection = {
@@ -22,6 +42,9 @@ export type RecentDetection = {
   priority: Priority
   createdAt: string
   time?: string
+  cameraId?: number | null
+  batchJobId?: number | null
+  camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
   userId?: number | null
   researcher?: string
   researcherEmail?: string | null
@@ -45,12 +68,16 @@ export type BatchJob = {
   createdAt: string
   error?: string | null
   failedImages: number
+  pendingImages?: number
+  percentage?: number | null
   processedImages: number
   researcher?: string | null
   researcherEmail?: string | null
   status: string
   totalImages: number
   zipName: string
+  cameraId?: number | null
+  camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
 }
 
 export type DashboardView = 'dashboard' | 'map' | 'species' | 'reviews' | 'reports' | 'support'

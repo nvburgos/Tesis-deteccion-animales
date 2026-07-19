@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import Header from '@/components/Header'
 import Sidebar from '@/components/Sidebar'
 import StatsCards from '@/components/StatsCards'
-import type { DashboardMetric, RecentDetection } from '@/components/dashboardTypes'
+import type { CameraSummary, DashboardMetric, RecentDetection } from '@/components/dashboardTypes'
 
 type DetectionsResponse = {
   currentUser?: {
@@ -25,15 +25,23 @@ type InvestigatorsResponse = {
   investigators: Investigator[]
 }
 
+type CamerasResponse = {
+  cameras: CameraSummary[]
+}
+
 function formatPercent(value: number) {
   return `${Math.round(value)}%`
 }
 
-async function fetchDetections(researcherId = '') {
+async function fetchDetections(researcherId = '', cameraId = '') {
   const params = new URLSearchParams({ limit: 'all' })
 
   if (researcherId) {
     params.set('researcherId', researcherId)
+  }
+
+  if (cameraId) {
+    params.set('cameraId', cameraId)
   }
 
   const response = await fetch(`/api/detections?${params.toString()}`, { cache: 'no-store' })
@@ -55,15 +63,33 @@ async function fetchInvestigators() {
   return (await response.json()) as InvestigatorsResponse
 }
 
+async function fetchCameras() {
+  const response = await fetch('/api/cameras', { cache: 'no-store' })
+
+  if (!response.ok) {
+    return { cameras: [] }
+  }
+
+  return (await response.json()) as CamerasResponse
+}
+
 export default function EstadisticasPage() {
+  const [cameras, setCameras] = useState<CameraSummary[]>([])
   const [detections, setDetections] = useState<RecentDetection[]>([])
   const [investigators, setInvestigators] = useState<Investigator[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
+  const [cameraFilter, setCameraFilter] = useState('')
   const [researcherFilter, setResearcherFilter] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchDetections(researcherFilter)
+    const initialCameraId = new URLSearchParams(window.location.search).get('cameraId') ?? ''
+    setCameraFilter(initialCameraId)
+    fetchCameras().then((cameraData) => setCameras(cameraData.cameras))
+  }, [])
+
+  useEffect(() => {
+    fetchDetections(researcherFilter, cameraFilter)
       .then((data) => {
         const userIsAdmin = data.currentUser?.role === 'Admin'
 
@@ -77,7 +103,7 @@ export default function EstadisticasPage() {
       .catch((loadError: unknown) => {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando estadisticas')
       })
-  }, [researcherFilter])
+  }, [cameraFilter, researcherFilter])
 
   const detectedRows = useMemo(
     () => detections.filter((detection) => detection.species !== 'Sin deteccion' && detection.confidence > 0),
@@ -136,8 +162,20 @@ export default function EstadisticasPage() {
         <div className="contentArea">
           {error ? <div className="statusBanner">{error}</div> : null}
 
-          {isAdmin ? (
-            <section className="filterPanel" aria-label="Filtro por investigador">
+          <section className="filterPanel" aria-label="Filtros de estadisticas">
+            <label>
+              <span>Camara</span>
+              <select value={cameraFilter} onChange={(event) => setCameraFilter(event.target.value)}>
+                <option value="">Todas las camaras</option>
+                {cameras.map((camera) => (
+                  <option key={camera.id} value={camera.id}>
+                    {camera.code} · {camera.zone}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {isAdmin ? (
               <label>
                 <span>Investigador</span>
                 <select value={researcherFilter} onChange={(event) => setResearcherFilter(event.target.value)}>
@@ -149,8 +187,8 @@ export default function EstadisticasPage() {
                   ))}
                 </select>
               </label>
-            </section>
-          ) : null}
+            ) : null}
+          </section>
 
           <StatsCards metrics={metrics} />
 

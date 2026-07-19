@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+﻿import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { copyFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -174,12 +174,14 @@ export async function runBatchPredictions(manifestPath: string) {
 
 export async function createDetectionFromPrediction({
   batchJobId,
+  cameraId,
   location,
   owner,
   prediction,
   publicPath
 }: {
   batchJobId?: number
+  cameraId?: number
   location: string
   owner: DetectionOwner
   prediction: PredictionResult
@@ -191,6 +193,7 @@ export async function createDetectionFromPrediction({
   const detection = await prisma.detection.create({
     data: {
       batchJobId,
+      cameraId,
       confidence: prediction.confidence,
       imagePath: publicPath,
       location,
@@ -208,6 +211,7 @@ export async function createDetectionFromPrediction({
     confidence: detection.confidence,
     coordinates,
     createdAt: detection.createdAt.toISOString(),
+    cameraId: detection.cameraId,
     imagePath: detection.imagePath,
     location: detection.location,
     message: prediction.message,
@@ -218,3 +222,4 @@ export async function createDetectionFromPrediction({
     warning: prediction.warning
   }
 }
+

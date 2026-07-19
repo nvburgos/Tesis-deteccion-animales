@@ -1,5 +1,5 @@
 import { exec } from 'node:child_process'
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { cookies } from 'next/headers'
@@ -8,18 +8,13 @@ import type { Prisma } from '@prisma/client'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
-import {
-  copyBatchImageToUploads,
-  createDetectionFromPrediction,
-  runBatchPredictions,
-  sanitizeFilename
-} from '@/lib/predictionRunner'
+import { sanitizeFilename } from '@/lib/predictionRunner'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const execAsync = promisify(exec)
-const imageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp'])
+const imageExtensionPattern = '\\.(jpg|jpeg|png|webp|bmp)$'
 
 function quotePowerShellLiteral(value: string) {
   return `'${value.replace(/'/g, "''")}'`
@@ -41,21 +36,20 @@ async function getCurrentUser() {
   })
 }
 
-async function listImageFiles(directory: string): Promise<string[]> {
-  const entries = await readdir(directory, { withFileTypes: true })
-  const files = await Promise.all(
-    entries.map(async (entry) => {
-      const entryPath = path.join(directory, entry.name)
+async function countZipImages(zipPath: string) {
+  const command = [
+    'Add-Type -AssemblyName System.IO.Compression.FileSystem',
+    `$zip = [System.IO.Compression.ZipFile]::OpenRead(${quotePowerShellLiteral(zipPath)})`,
+    'try {',
+    `  ($zip.Entries | Where-Object { $_.FullName -match ${quotePowerShellLiteral(imageExtensionPattern)} }).Count`,
+    '} finally {',
+    '  $zip.Dispose()',
+    '}'
+  ].join('; ')
+  const { stdout } = await execAsync(`powershell -NoProfile -Command "${command}"`, { timeout: 120000 })
+  const count = Number(stdout.trim())
 
-      if (entry.isDirectory()) {
-        return listImageFiles(entryPath)
-      }
-
-      return imageExtensions.has(path.extname(entry.name).toLowerCase()) ? [entryPath] : []
-    })
-  )
-
-  return files.flat()
+  return Number.isFinite(count) && count >= 0 ? count : 0
 }
 
 function toPublicBatchJob(job: {
@@ -66,8 +60,15 @@ function toPublicBatchJob(job: {
   processedImages: number
   failedImages: number
   error: string | null
+  cameraId: number | null
   createdAt: Date
   completedAt: Date | null
+  camera?: {
+    id: number
+    code: string
+    name: string
+    zone: string
+  } | null
   user?: {
     id: number
     name: string
@@ -80,6 +81,8 @@ function toPublicBatchJob(job: {
     error: job.error,
     failedImages: job.failedImages,
     id: job.id,
+    cameraId: job.cameraId,
+    camera: job.camera ?? null,
     processedImages: job.processedImages,
     researcher: job.user?.name ?? null,
     researcherEmail: job.user?.email ?? null,
@@ -89,17 +92,31 @@ function toPublicBatchJob(job: {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const currentUser = await getCurrentUser()
 
   if (!currentUser) {
     return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
   }
 
+  const cameraId = Number(request.nextUrl.searchParams.get('cameraId') ?? '')
   const isAdmin = isAdminRole(currentUser.role)
   const where: Prisma.BatchJobWhereInput = isAdmin ? {} : { userId: currentUser.id }
+
+  if (Number.isInteger(cameraId) && cameraId > 0) {
+    where.cameraId = cameraId
+  }
+
   const jobs = await prisma.batchJob.findMany({
     include: {
+      camera: {
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          zone: true
+        }
+      },
       user: {
         select: {
           email: true,
@@ -109,7 +126,6 @@ export async function GET() {
       }
     },
     orderBy: { createdAt: 'desc' },
-    take: 12,
     where
   })
 
@@ -127,142 +143,79 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData()
   const zip = formData.get('zip')
-  const location = String(formData.get('location') || 'Camara 01 | Zona Norte')
+  const cameraId = Number(formData.get('cameraId') ?? '')
 
   if (!(zip instanceof File) || !zip.name.toLowerCase().endsWith('.zip')) {
     return NextResponse.json({ error: 'Debes subir un archivo .zip' }, { status: 400 })
   }
 
+  if (!Number.isInteger(cameraId) || cameraId <= 0) {
+    return NextResponse.json({ error: 'Camara requerida' }, { status: 400 })
+  }
+
+  const camera = await prisma.camera.findFirst({
+    where: { id: cameraId, active: true },
+    select: {
+      code: true,
+      id: true,
+      name: true,
+      zone: true
+    }
+  })
+
+  if (!camera) {
+    return NextResponse.json({ error: 'Camara no encontrada' }, { status: 404 })
+  }
+
   const job = await prisma.batchJob.create({
     data: {
-      status: 'Procesando',
+      cameraId: camera.id,
+      status: 'Pendiente',
       userId: currentUser.id,
       zipName: sanitizeFilename(zip.name || 'imagenes.zip')
+    },
+    include: {
+      camera: { select: { code: true, id: true, name: true, zone: true } },
+      user: { select: { email: true, id: true, name: true } }
     }
   })
 
   const batchRoot = path.join(process.cwd(), 'public', 'uploads', 'batches', String(job.id))
-  const extractDir = path.join(batchRoot, 'extracted')
   const zipPath = path.join(batchRoot, job.zipName)
 
   try {
-    await mkdir(extractDir, { recursive: true })
+    await mkdir(batchRoot, { recursive: true })
     await writeFile(zipPath, Buffer.from(await zip.arrayBuffer()))
 
-    await execAsync(
-      `powershell -NoProfile -Command "Expand-Archive -LiteralPath ${quotePowerShellLiteral(zipPath)} -DestinationPath ${quotePowerShellLiteral(extractDir)} -Force"`,
-      { timeout: 120000 }
+    const totalImages = await countZipImages(zipPath)
+    const updatedJob = await prisma.batchJob.update({
+      data: { totalImages },
+      include: {
+        camera: { select: { code: true, id: true, name: true, zone: true } },
+        user: { select: { email: true, id: true, name: true } }
+      },
+      where: { id: job.id }
+    })
+
+    return NextResponse.json(
+      {
+        batchId: updatedJob.id,
+        job: toPublicBatchJob(updatedJob),
+        status: updatedJob.status,
+        totalImages: updatedJob.totalImages
+      },
+      { status: 202 }
     )
-
-    const imageFiles = await listImageFiles(extractDir)
-
-    if (imageFiles.length === 0) {
-      const failedJob = await prisma.batchJob.update({
-        data: {
-          completedAt: new Date(),
-          error: 'El ZIP no contiene imagenes compatibles',
-          status: 'Fallido',
-          totalImages: 0
-        },
-        where: { id: job.id }
-      })
-
-      return NextResponse.json({ error: failedJob.error, job: toPublicBatchJob(failedJob) }, { status: 422 })
-    }
-
-    await prisma.batchJob.update({
-      data: { totalImages: imageFiles.length },
-      where: { id: job.id }
-    })
-
-    const uploadedImages = []
-
-    for (const imagePath of imageFiles) {
-      try {
-        const uploadedImage = await copyBatchImageToUploads(imagePath, job.id)
-        uploadedImages.push(uploadedImage)
-      } catch (error) {
-        console.error('Batch image copy error:', error)
-      }
-    }
-
-    if (uploadedImages.length === 0) {
-      throw new Error('No se pudieron preparar imagenes del ZIP para analisis')
-    }
-
-    const manifestPath = path.join(batchRoot, 'manifest.json')
-    await writeFile(manifestPath, JSON.stringify(uploadedImages.map((image) => image.diskPath)), 'utf-8')
-
-    const batchPredictions = await runBatchPredictions(manifestPath)
-    const imageByDiskPath = new Map(uploadedImages.map((image) => [image.diskPath, image]))
-    let processedImages = 0
-    let failedImages = imageFiles.length - uploadedImages.length
-
-    for (const batchPrediction of batchPredictions) {
-      const uploadedImage = imageByDiskPath.get(batchPrediction.imagePath)
-
-      if (!uploadedImage || batchPrediction.prediction.error) {
-        failedImages += 1
-      } else {
-        await createDetectionFromPrediction({
-          batchJobId: job.id,
-          location,
-          owner: currentUser,
-          prediction: batchPrediction.prediction,
-          publicPath: uploadedImage.publicPath
-        })
-        processedImages += 1
-      }
-
-      await prisma.batchJob.update({
-        data: { failedImages, processedImages },
-        where: { id: job.id }
-      })
-    }
-
-    const completedJob = await prisma.batchJob.update({
-      data: {
-        completedAt: new Date(),
-        failedImages,
-        processedImages,
-        status: failedImages === imageFiles.length ? 'Fallido' : failedImages > 0 ? 'Completado con errores' : 'Completado'
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-            id: true,
-            name: true
-          }
-        }
-      },
-      where: { id: job.id }
-    })
-
-    await rm(extractDir, { force: true, recursive: true }).catch(() => undefined)
-
-    return NextResponse.json({ job: toPublicBatchJob(completedJob) })
   } catch (error) {
-    console.error('Batch API error:', error)
-
-    const failedJob = await prisma.batchJob.update({
+    await prisma.batchJob.update({
       data: {
         completedAt: new Date(),
-        error: error instanceof Error ? error.message : 'Error procesando el ZIP',
-        status: 'Fallido'
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-            id: true,
-            name: true
-          }
-        }
+        error: error instanceof Error ? error.message : 'ZIP invalido',
+        status: 'Con errores'
       },
       where: { id: job.id }
     })
 
-    return NextResponse.json({ error: failedJob.error, job: toPublicBatchJob(failedJob) }, { status: 500 })
+    return NextResponse.json({ error: 'No se pudo registrar el ZIP' }, { status: 400 })
   }
 }
