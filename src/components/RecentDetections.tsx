@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { getSpeciesLabel, uiText, type UiText } from '@/lib/i18n'
@@ -38,11 +38,13 @@ function formatConfidence(confidence: number) {
 
 export default function RecentDetections({
   detections,
+  historyHref = '/historial',
   language = 'es',
   showResearcher = false,
   text = uiText[language]
 }: {
   detections: RecentDetection[]
+  historyHref?: string
   language?: Language
   showResearcher?: boolean
   text?: UiText
@@ -78,6 +80,9 @@ export default function RecentDetections({
             {detections.length > 0 ? (
               detections.map((detection) => {
                 const speciesLabel = getSpeciesLabel(detection.species, language)
+                const locationLabel = detection.camera
+                  ? `${detection.camera.code} · ${detection.camera.zone}`
+                  : detection.location
 
                 return (
                   <tr key={detection.id}>
@@ -104,7 +109,7 @@ export default function RecentDetections({
                         {detection.researcherEmail ? <span className="tableSubtext">{detection.researcherEmail}</span> : null}
                       </td>
                     ) : null}
-                    <td>{detection.location}</td>
+                    <td>{locationLabel}</td>
                     <td>
                       <PriorityBadge language={language} priority={detection.priority} />
                     </td>
@@ -133,7 +138,7 @@ export default function RecentDetections({
         </table>
       </div>
 
-      <Link className="historyButton" href="/historial">
+      <Link className="historyButton" href={historyHref}>
         {text.history}
       </Link>
     </section>

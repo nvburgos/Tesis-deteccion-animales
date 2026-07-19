@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ensureDatabase } from '@/lib/database'
 import { calculatePriority } from '@/lib/detections'
@@ -31,12 +31,31 @@ export async function POST(request: Request) {
 
     const formData = await request.formData()
     const image = formData.get('image')
-    const location = String(formData.get('location') || 'Camara 01 | Zona Norte')
+    const cameraId = Number(formData.get('cameraId') ?? '')
 
     if (!(image instanceof File)) {
       return NextResponse.json({ error: 'Image file is required' }, { status: 400 })
     }
 
+    if (!Number.isInteger(cameraId) || cameraId <= 0) {
+      return NextResponse.json({ error: 'Camara requerida' }, { status: 400 })
+    }
+
+    const camera = await prisma.camera.findUnique({
+      where: { id: cameraId },
+      select: {
+        code: true,
+        id: true,
+        name: true,
+        zone: true
+      }
+    })
+
+    if (!camera) {
+      return NextResponse.json({ error: 'Camara no encontrada' }, { status: 404 })
+    }
+
+    const location = String(formData.get('location') || `${camera.name} | ${camera.zone}`)
     const { diskPath, publicPath } = await saveUploadedImage(image)
     const prediction = await runPrediction(diskPath)
 
@@ -48,6 +67,8 @@ export async function POST(request: Request) {
           confidence: prediction.confidence,
           imagePath: publicPath,
           location,
+          cameraId: camera.id,
+          camera,
           priority: calculatePriority(prediction.species, prediction.confidence),
           warning: prediction.warning,
           message: prediction.message
@@ -57,13 +78,14 @@ export async function POST(request: Request) {
     }
 
     const detection = await createDetectionFromPrediction({
+      cameraId: camera.id,
       location,
       owner: user,
       prediction,
       publicPath
     })
 
-    return NextResponse.json(detection)
+    return NextResponse.json({ ...detection, camera })
   } catch (error) {
     console.error('Analyze API error:', error)
 

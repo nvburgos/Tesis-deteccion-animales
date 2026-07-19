@@ -14,6 +14,8 @@ model Detection {
   confidence       Float
   location         String
   priority         String
+  cameraId         Int?
+  camera           Camera?   @relation(fields: [cameraId], references: [id])
   userId           Int?
   user             User?     @relation(fields: [userId], references: [id])
   batchJobId       Int?
@@ -25,6 +27,8 @@ model Detection {
   manualReviewedAt DateTime?
   manualReviewNote String?
   createdAt        DateTime  @default(now())
+
+  @@index([cameraId])
 }
 
 model BatchJob {
@@ -35,11 +39,15 @@ model BatchJob {
   processedImages Int         @default(0)
   failedImages    Int         @default(0)
   error           String?
+  cameraId        Int?
+  camera          Camera?     @relation(fields: [cameraId], references: [id])
   userId          Int
   user            User        @relation(fields: [userId], references: [id])
   detections      Detection[]
   createdAt       DateTime    @default(now())
   completedAt     DateTime?
+
+  @@index([cameraId])
 }
 
 model User {
@@ -52,4 +60,17 @@ model User {
   createdAt    DateTime    @default(now())
   detections   Detection[]
   batchJobs    BatchJob[]
+}
+
+model Camera {
+  id          Int         @id @default(autoincrement())
+  code        String      @unique
+  name        String
+  zone        String
+  description String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  detections  Detection[]
+  batchJobs   BatchJob[]
 }

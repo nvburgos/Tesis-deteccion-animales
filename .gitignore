@@ -61,3 +61,6 @@ python/datasets_raw/*
 
 # Base de datos local
 prisma/dev.db
+
+.tmp/
+public/uploads/

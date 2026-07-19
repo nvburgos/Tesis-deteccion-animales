@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Printer } from 'lucide-react'
@@ -54,13 +54,14 @@ function escapeCsv(value: string | number | null | undefined) {
 }
 
 function exportDetectionsCsv(detections: RecentDetection[], language: Language) {
-  const headers = ['fecha', 'especie', 'confianza', 'prioridad', 'ubicacion', 'investigador', 'imagen']
+  const headers = ['fecha', 'especie', 'confianza', 'prioridad', 'ubicacion', 'camara', 'investigador', 'imagen']
   const rows = detections.map((detection) => [
     new Date(detection.createdAt).toLocaleString(language === 'es' ? 'es-ES' : 'en-US'),
     getSpeciesLabel(detection.species, language),
     detection.confidence,
     detection.priority,
     detection.location,
+    detection.camera ? `${detection.camera.code} ${detection.camera.zone}` : '',
     detection.researcher ?? '',
     detection.imagePath
   ])
@@ -77,8 +78,14 @@ function exportDetectionsCsv(detections: RecentDetection[], language: Language) 
   URL.revokeObjectURL(url)
 }
 
-async function fetchAllDetections() {
-  const response = await fetch('/api/detections?limit=all', { cache: 'no-store' })
+async function fetchAllDetections(cameraId?: number) {
+  const params = new URLSearchParams({ limit: 'all' })
+
+  if (cameraId) {
+    params.set('cameraId', String(cameraId))
+  }
+
+  const response = await fetch(`/api/detections?${params.toString()}`, { cache: 'no-store' })
 
   if (!response.ok) {
     throw new Error('No se pudieron cargar los datos del reporte')
@@ -88,10 +95,12 @@ async function fetchAllDetections() {
 }
 
 export default function ReportsPanel({
+  cameraId,
   language,
   seedDetections,
   text
 }: {
+  cameraId?: number
   language: Language
   seedDetections: RecentDetection[]
   text: UiText
@@ -103,12 +112,12 @@ export default function ReportsPanel({
   const [speciesFilter, setSpeciesFilter] = useState('')
 
   useEffect(() => {
-    fetchAllDetections()
+    fetchAllDetections(cameraId)
       .then((data) => setDetections(data.detections))
       .catch((loadError: unknown) => {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando reportes')
       })
-  }, [])
+  }, [cameraId])
 
   const filteredDetections = useMemo(
     () =>
@@ -301,7 +310,7 @@ export default function ReportsPanel({
               priorityFindings.map((detection) => (
                 <div className="reportFinding" key={detection.id}>
                   <strong>{getSpeciesLabel(detection.species, language)}</strong>
-                  <span>{detection.location}</span>
+                  <span>{detection.camera ? `${detection.camera.code} · ${detection.camera.zone}` : detection.location}</span>
                   <time dateTime={detection.createdAt}>
                     {new Date(detection.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' })}
                   </time>
