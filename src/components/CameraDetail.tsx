@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -12,14 +12,13 @@ import DetectionDetailModal from './DetectionDetailModal'
 import Header, { type HeaderNotification } from './Header'
 import IndividualAnalysisPanel from './IndividualAnalysisPanel'
 import ManualReviewsPanel from './ManualReviewsPanel'
-import ReportsPanel from './ReportsPanel'
 import Sidebar from './Sidebar'
 import SpeciesDistribution from './SpeciesDistribution'
 import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
-import SupportUnavailable from './SupportUnavailable'
 import UploadTabs, { type UploadTab } from './UploadTabs'
 import { getSpeciesLabel, uiText } from '@/lib/i18n'
+import { isPendingManualReview } from '@/lib/manualReviewPolicy'
 import type {
   BatchJob,
   CameraSummary,
@@ -415,7 +414,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
       })
       .catch((loadError: unknown) => {
         if (!isCancelled) {
-          console.error('[batch-debug] error cargando lote seleccionado', loadError)
+          console.error('Selected batch load error:', loadError)
           setError('No se pudo actualizar temporalmente el progreso.')
         }
       })
@@ -498,7 +497,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
         tone: 'alert' as const
       }))
     const reviewItems = detections
-      .filter((detection) => detection.priority === 'Revision manual' && !detection.manualReviewedAt)
+      .filter(isPendingManualReview)
       .slice(0, 3)
       .map((detection) => ({
         description:
@@ -684,10 +683,6 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
               onReviewCompleted={handleManualReviewCompleted}
               text={text}
             />
-          ) : activeView === 'reports' ? (
-            <ReportsPanel cameraId={camera.id} seedDetections={detections} language={language} text={text} />
-          ) : activeView === 'support' ? (
-            <SupportUnavailable text={text} />
           ) : (
             <>
               <StatsCards metrics={metrics} text={text} />

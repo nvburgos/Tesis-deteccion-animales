@@ -1,8 +1,9 @@
-﻿import { cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 export const dynamic = 'force-dynamic'
 
@@ -120,11 +121,16 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
   try {
     const currentUser = await getCurrentUser()
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
+    }
+
+    if (!isAdminRole(currentUser.role)) {
+      return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 })
     }
 
     const cameraId = await getCameraId(context)
@@ -186,12 +192,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
   try {
     const currentUser = await getCurrentUser()
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
+    }
+
+    if (!isAdminRole(currentUser.role)) {
+      return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 })
     }
 
     const cameraId = await getCameraId(context)
@@ -220,3 +231,8 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     return NextResponse.json({ error: 'No se pudo eliminar la camara' }, { status: 500 })
   }
 }
+
+
+
+
+

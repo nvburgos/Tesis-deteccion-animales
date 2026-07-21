@@ -7,6 +7,7 @@ import sharp from 'sharp'
 import { calculatePriority } from '@/lib/detections'
 import { prisma } from '@/lib/prisma'
 import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
+import { getStorageRoot, toProtectedDetectionImagePath } from '@/lib/fileStorage'
 
 const execFileAsync = promisify(execFile)
 const defaultMaxImageDimension = 1280
@@ -127,7 +128,7 @@ function parseBatchPredictions(stdout: string): BatchPredictionResult[] {
 export async function saveUploadedImage(image: File) {
   const bytes = await image.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+  const uploadDir = path.join(getStorageRoot(), 'uploads')
   const optimizedImage = await optimizeImageForAnalysis(buffer)
   const originalName = sanitizeFilename(image.name || 'camera-trap.jpg')
   const parsedName = path.parse(originalName)
@@ -135,7 +136,7 @@ export async function saveUploadedImage(image: File) {
     ? `${Date.now()}-${sanitizeFilename(parsedName.name || 'camera-trap')}${optimizedImage.extension}`
     : `${Date.now()}-${originalName}`
   const diskPath = path.join(uploadDir, filename)
-  const publicPath = `/uploads/${filename}`
+  const publicPath = `uploads/${filename}`
 
   await mkdir(uploadDir, { recursive: true })
   await writeFile(diskPath, optimizedImage.buffer)
@@ -144,10 +145,10 @@ export async function saveUploadedImage(image: File) {
 }
 
 export async function copyBatchImageToUploads(sourcePath: string, jobId: number) {
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+  const uploadDir = path.join(getStorageRoot(), 'uploads')
   const filename = `${Date.now()}-batch-${jobId}-${sanitizeFilename(path.basename(sourcePath))}`
   const diskPath = path.join(uploadDir, filename)
-  const publicPath = `/uploads/${filename}`
+  const publicPath = `uploads/${filename}`
 
   await mkdir(uploadDir, { recursive: true })
   await copyFile(sourcePath, diskPath)
@@ -216,6 +217,7 @@ export async function createDetectionFromPrediction({
       y2: coordinates?.[3]
     },
     select: {
+      id: true,
       confidence: true,
       createdAt: true,
       ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
@@ -234,7 +236,7 @@ export async function createDetectionFromPrediction({
     capturedAt: detection.capturedAt?.toISOString() ?? null,
     captureDateSource: detection.captureDateSource,
     cameraId: detection.cameraId,
-    imagePath: detection.imagePath,
+    imagePath: toProtectedDetectionImagePath(detection.id),
     location: detection.location,
     message: prediction.message,
     priority: detection.priority,
@@ -244,4 +246,6 @@ export async function createDetectionFromPrediction({
     warning: prediction.warning
   }
 }
+
+
 

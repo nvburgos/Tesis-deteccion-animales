@@ -83,7 +83,7 @@ export default function DetectionDetailModal({
   }, [coordinates, imageSize.height, imageSize.width, speciesLabel])
 
   useEffect(() => {
-    if (!detection) {
+    if (!detection?.id) {
       return
     }
 

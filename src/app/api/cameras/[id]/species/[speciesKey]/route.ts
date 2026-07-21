@@ -4,9 +4,11 @@ import type { Prisma } from '@prisma/client'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { toProtectedDetectionImagePath } from '@/lib/fileStorage'
 import { formatRelativeDate } from '@/lib/detections'
 import { getSpeciesLabel } from '@/lib/i18n'
 import { getTaxonomicGroup } from '@/lib/speciesTaxonomy'
+import { isValidSpecies } from '@/lib/detectionClassification'
 import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +36,7 @@ async function getParams(context: { params: Promise<{ id: string; speciesKey: st
 
 function normalizePriority(priority: string) {
   if (priority === 'Alta') return 'Alta prioridad'
-  if (priority === 'RevisiÃƒÂ³n manual') return 'Revision manual'
+  if (priority === 'RevisiÃƒÆ’Ã‚Â³n manual') return 'Revision manual'
   return priority
 }
 
@@ -53,15 +55,21 @@ function toPublicDetection(detection: {
   y2: number | null
   manualReviewedAt: Date | null
   manualReviewNote: string | null
+  manualReviewStatus?: string | null
+  reviewedById?: number | null
+  manualOriginalSpecies?: string | null
+  manualCorrectedSpecies?: string | null
+  reviewVersion?: number
   createdAt: Date
   capturedAt?: Date | null
   captureDateSource?: string | null
   userId: number | null
   camera?: { id: number; code: string; name: string; zone: string } | null
+  reviewedBy?: { id: number; name: string; email: string } | null
 }) {
   return {
     id: detection.id,
-    imagePath: detection.imagePath,
+    imagePath: toProtectedDetectionImagePath(detection.id),
     species: detection.species,
     confidence: Math.round(detection.confidence),
     location: detection.location,
@@ -75,6 +83,12 @@ function toPublicDetection(detection: {
     y2: detection.y2,
     manualReviewedAt: detection.manualReviewedAt?.toISOString() ?? null,
     manualReviewNote: detection.manualReviewNote,
+    manualReviewStatus: detection.manualReviewStatus ?? null,
+    reviewedById: detection.reviewedById ?? null,
+    reviewedBy: detection.reviewedBy ?? null,
+    manualOriginalSpecies: detection.manualOriginalSpecies ?? null,
+    manualCorrectedSpecies: detection.manualCorrectedSpecies ?? null,
+    reviewVersion: detection.reviewVersion ?? 0,
     userId: detection.userId,
     createdAt: detection.createdAt.toISOString(),
     capturedAt: detection.capturedAt?.toISOString() ?? null,
@@ -113,6 +127,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
     if (!params) {
       return NextResponse.json({ error: 'Parametros invalidos' }, { status: 400 })
+    }
+
+    if (!isValidSpecies(params.species)) {
+      return NextResponse.json({ error: 'Especie invalida para analisis' }, { status: 400 })
     }
 
     const camera = await prisma.camera.findFirst({ where: { id: params.cameraId, active: true }, select: { code: true, id: true, name: true, zone: true } })
@@ -162,7 +180,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           createdAt: true,
           userId: true,
           ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
-          camera: { select: { code: true, id: true, name: true, zone: true } }
+          camera: { select: { code: true, id: true, name: true, zone: true } },
+          reviewedBy: { select: { email: true, id: true, name: true } }
         },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -225,3 +244,4 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ error: 'No se pudo cargar el detalle de especie' }, { status: 500 })
   }
 }
+

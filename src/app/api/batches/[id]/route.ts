@@ -4,7 +4,9 @@ import type { Prisma } from '@prisma/client'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { toProtectedDetectionImagePath } from '@/lib/fileStorage'
 import { formatRelativeDate } from '@/lib/detections'
+import { invalidSpeciesValues } from '@/lib/detectionClassification'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +42,7 @@ function normalizePriority(priority: string) {
     return 'Alta prioridad'
   }
 
-  if (priority === 'Revisión manual') {
+  if (priority === 'RevisiÃƒÆ’Ã‚Â³n manual') {
     return 'Revision manual'
   }
 
@@ -74,6 +76,11 @@ function toPublicDetection(detection: {
   y2: number | null
   manualReviewedAt: Date | null
   manualReviewNote: string | null
+  manualReviewStatus?: string | null
+  reviewedById?: number | null
+  manualOriginalSpecies?: string | null
+  manualCorrectedSpecies?: string | null
+  reviewVersion?: number
   createdAt: Date
   capturedAt?: Date | null
   captureDateSource?: string | null
@@ -84,10 +91,15 @@ function toPublicDetection(detection: {
     name: string
     zone: string
   } | null
+  reviewedBy?: {
+    id: number
+    name: string
+    email: string
+  } | null
 }) {
   return {
     id: detection.id,
-    imagePath: detection.imagePath,
+    imagePath: toProtectedDetectionImagePath(detection.id),
     species: detection.species,
     confidence: Math.round(detection.confidence),
     location: detection.location,
@@ -101,6 +113,12 @@ function toPublicDetection(detection: {
     y2: detection.y2,
     manualReviewedAt: detection.manualReviewedAt?.toISOString() ?? null,
     manualReviewNote: detection.manualReviewNote,
+    manualReviewStatus: detection.manualReviewStatus ?? null,
+    reviewedById: detection.reviewedById ?? null,
+    reviewedBy: detection.reviewedBy ?? null,
+    manualOriginalSpecies: detection.manualOriginalSpecies ?? null,
+    manualCorrectedSpecies: detection.manualCorrectedSpecies ?? null,
+    reviewVersion: detection.reviewVersion ?? 0,
     userId: detection.userId,
     createdAt: detection.createdAt.toISOString(),
     capturedAt: detection.capturedAt?.toISOString() ?? null,
@@ -120,6 +138,13 @@ function toPublicBatchJob(job: {
   cameraId: number | null
   createdAt: Date
   completedAt: Date | null
+  startedAt?: Date | null
+  heartbeatAt?: Date | null
+  workerId?: string | null
+  attempts?: number
+  lastError?: string | null
+  nextRetryAt?: Date | null
+  cancelRequestedAt?: Date | null
   camera: {
     id: number
     code: string
@@ -133,6 +158,13 @@ function toPublicBatchJob(job: {
     completedAt: job.completedAt?.toISOString() ?? null,
     createdAt: job.createdAt.toISOString(),
     error: job.error,
+    startedAt: job.startedAt?.toISOString() ?? null,
+    heartbeatAt: job.heartbeatAt?.toISOString() ?? null,
+    workerId: job.workerId ?? null,
+    attempts: job.attempts ?? 0,
+    lastError: job.lastError ?? null,
+    nextRetryAt: job.nextRetryAt?.toISOString() ?? null,
+    cancelRequestedAt: job.cancelRequestedAt?.toISOString() ?? null,
     failedImages: job.failedImages,
     id: job.id,
     cameraId: job.cameraId,
@@ -220,25 +252,33 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   if (detectionState === 'with') {
     where.AND = [
       ...(Array.isArray(where.AND) ? where.AND : []),
-      { species: { not: 'Sin deteccion' } },
+      { species: { notIn: invalidSpeciesValues } },
       { confidence: { gt: 0 } }
     ]
   } else if (detectionState === 'without') {
-    where.OR = [{ species: 'Sin deteccion' }, { confidence: { lte: 0 } }]
+    where.OR = [{ species: { in: invalidSpeciesValues } }, { confidence: { lte: 0 } }]
   }
 
   const baseWhere: Prisma.DetectionWhereInput = { batchJobId: batchId, ...(isAdmin ? {} : { userId: currentUser.id }) }
   const positiveWhere: Prisma.DetectionWhereInput = {
     ...baseWhere,
-    species: { not: 'Sin deteccion' },
-    confidence: { gt: 0 }
+    confidence: { gt: 0 },
+    species: { notIn: invalidSpeciesValues }
   }
-  const withoutDetectionWhere: Prisma.DetectionWhereInput = {
+  const withoutWhere: Prisma.DetectionWhereInput = {
     ...baseWhere,
-    OR: [{ species: 'Sin deteccion' }, { confidence: { lte: 0 } }]
+    OR: [{ species: { in: invalidSpeciesValues } }, { confidence: { lte: 0 } }]
   }
 
-  const [totalFiltered, detections, animalDetections, withoutDetection, speciesDistribution] = await Promise.all([
+  const [animalDetections, withoutDetection, speciesDistributionRows, totalFiltered, detections] = await Promise.all([
+    prisma.detection.count({ where: positiveWhere }),
+    prisma.detection.count({ where: withoutWhere }),
+    prisma.detection.groupBy({
+      by: ['species'],
+      _count: { _all: true },
+      orderBy: { _count: { species: 'desc' } },
+      where: positiveWhere
+    }),
     prisma.detection.count({ where }),
     prisma.detection.findMany({
       orderBy: { createdAt: 'desc' },
@@ -257,6 +297,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         y2: true,
         manualReviewedAt: true,
         manualReviewNote: true,
+        manualReviewStatus: true,
+        reviewedById: true,
+        manualOriginalSpecies: true,
+        manualCorrectedSpecies: true,
+        reviewVersion: true,
         createdAt: true,
         userId: true,
         camera: {
@@ -266,19 +311,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             name: true,
             zone: true
           }
+        },
+        reviewedBy: {
+          select: {
+            email: true,
+            id: true,
+            name: true
+          }
         }
       },
       skip: (page - 1) * pageSize,
       take: pageSize,
       where
-    }),
-    prisma.detection.count({ where: positiveWhere }),
-    prisma.detection.count({ where: withoutDetectionWhere }),
-    prisma.detection.groupBy({
-      by: ['species'],
-      _count: { species: true },
-      orderBy: { _count: { species: 'desc' } },
-      where: positiveWhere
     })
   ])
 
@@ -291,6 +335,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       id: job.id,
       zipName: job.zipName,
       status: job.status,
+      startedAt: job.startedAt?.toISOString() ?? null,
+      heartbeatAt: job.heartbeatAt?.toISOString() ?? null,
+      attempts: job.attempts ?? 0,
+      lastError: job.lastError ?? null,
+      nextRetryAt: job.nextRetryAt?.toISOString() ?? null,
       totalImages: job.totalImages,
       processedImages: job.processedImages,
       failedImages: job.failedImages,
@@ -304,6 +353,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       batchId: job.id,
       zipName: job.zipName,
       status: job.status,
+      startedAt: job.startedAt?.toISOString() ?? null,
+      heartbeatAt: job.heartbeatAt?.toISOString() ?? null,
+      attempts: job.attempts ?? 0,
+      lastError: job.lastError ?? null,
+      nextRetryAt: job.nextRetryAt?.toISOString() ?? null,
       totalImages: job.totalImages,
       processedImages: job.processedImages,
       failedImages: job.failedImages,
@@ -312,15 +366,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       detectionsFound: animalDetections,
       animalDetections,
       withoutDetection,
-      distinctSpecies: speciesDistribution.length,
+      distinctSpecies: speciesDistributionRows.length,
       createdAt: job.createdAt.toISOString(),
       completedAt: job.completedAt?.toISOString() ?? null,
       durationMs,
       camera: job.camera,
-      speciesDistribution: speciesDistribution.map((item) => ({
-        species: item.species,
-        count: item._count.species
-      }))
+      speciesDistribution: speciesDistributionRows.map((item) => ({ species: item.species, count: item._count._all }))
     },
     detections: detections.map(toPublicDetection),
     pagination: {
@@ -331,3 +382,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     }
   })
 }
+
+
+

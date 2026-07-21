@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Activity, CheckCircle2, Gauge, TimerReset } from 'lucide-react'
 import type { BatchSummaryData } from './BatchSummary'
 import type { BatchJob, RecentDetection } from './dashboardTypes'
@@ -121,7 +121,7 @@ export default function BatchProgress({
   onBatchDetail?: (detail: BatchDetailResponse) => void
   zipName?: string
 }) {
-  const [now, setNow] = useState(() => Date.now())
+  const [, setNow] = useState(() => Date.now())
   const [pollingError, setPollingError] = useState('')
   const pollingBatchId = batchId ?? job?.id ?? null
 
@@ -141,7 +141,7 @@ export default function BatchProgress({
           onBatchDetail?.(detail)
         }
       } catch (pollError) {
-        console.error('[batch-debug] polling error:', pollError)
+        console.error('Batch polling error:', pollError)
         if (!isCancelled) {
           setPollingError('No se pudo actualizar temporalmente el progreso.')
         }
@@ -174,7 +174,7 @@ export default function BatchProgress({
   const percent = job?.percentage ?? (total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : null)
   const status = getStatusLabel(job?.status ?? (isProcessing ? 'Procesando' : 'Pendiente'), total)
   const elapsedSeconds = getElapsedSeconds(job?.createdAt, job?.completedAt)
-  const elapsed = useMemo(() => formatElapsed(job?.createdAt, job?.completedAt), [job?.createdAt, job?.completedAt, now])
+  const elapsed = formatElapsed(job?.createdAt, job?.completedAt)
   const speed = elapsedSeconds > 0 && completed > 0 ? Math.round((completed / elapsedSeconds) * 60) : 0
   const remainingSeconds = speed > 0 && pending > 0 ? Math.ceil((pending / speed) * 60) : null
   const isTerminal = isTerminalStatus(job?.status)

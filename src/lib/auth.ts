@@ -5,7 +5,11 @@ export const ADMIN_ROLE = 'Admin'
 export const INVESTIGATOR_ROLE = 'Investigador'
 
 function getAuthSecret() {
-  return process.env.AUTH_SECRET || 'wildlife-local-development-secret'
+  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET es obligatorio en produccion')
+  }
+  return 'wildlife-local-development-secret'
 }
 
 function sign(value: string) {
@@ -51,3 +55,4 @@ export function isValidSession(value?: string) {
 export function isAdminRole(role?: string | null) {
   return role === ADMIN_ROLE
 }
+

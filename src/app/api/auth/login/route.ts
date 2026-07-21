@@ -3,8 +3,16 @@ import { AUTH_COOKIE, createSessionValue } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { verifyPassword } from '@/lib/passwords'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 export async function POST(request: Request) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
+
+  const rateLimit = checkRateLimit('login:' + getClientIp(request), 20, 15 * 60 * 1000)
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Demasiados intentos de inicio de sesion. Intenta mas tarde.' }, { status: 429 })
+  }
   const body = (await request.json().catch(() => null)) as { email?: string; password?: string } | null
   const email = body?.email?.trim().toLowerCase() ?? ''
   const password = body?.password ?? ''
@@ -37,3 +45,5 @@ export async function POST(request: Request) {
 
   return response
 }
+
+
