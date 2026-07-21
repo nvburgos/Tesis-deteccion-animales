@@ -8,61 +8,91 @@ datasource db {
 }
 
 model Detection {
-  id                Int       @id @default(autoincrement())
-  imagePath         String
-  species           String
-  confidence        Float
-  location          String
-  priority          String
-  cameraId          Int?
-  camera            Camera?   @relation(fields: [cameraId], references: [id])
-  userId            Int?
-  user              User?     @relation(fields: [userId], references: [id])
-  batchJobId        Int?
-  batchJob          BatchJob? @relation(fields: [batchJobId], references: [id])
-  x1                Float?
-  y1                Float?
-  x2                Float?
-  y2                Float?
-  manualReviewedAt  DateTime?
-  manualReviewNote  String?
-  capturedAt        DateTime?
-  captureDateSource String?
-  createdAt         DateTime  @default(now())
+  id                     Int       @id @default(autoincrement())
+  imagePath              String
+  species                String
+  confidence             Float
+  location               String
+  priority               String
+  cameraId               Int?
+  camera                 Camera?   @relation(fields: [cameraId], references: [id])
+  userId                 Int?
+  user                   User?     @relation(fields: [userId], references: [id])
+  batchJobId             Int?
+  batchJob               BatchJob? @relation(fields: [batchJobId], references: [id])
+  x1                     Float?
+  y1                     Float?
+  x2                     Float?
+  y2                     Float?
+  manualReviewedAt       DateTime?
+  manualReviewNote       String?
+  manualReviewStatus     String?
+  reviewedById           Int?
+  reviewedBy             User?     @relation("DetectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  manualOriginalSpecies  String?
+  manualCorrectedSpecies String?
+  reviewVersion          Int       @default(0)
+  capturedAt             DateTime?
+  captureDateSource      String?
+  createdAt              DateTime  @default(now())
 
   @@index([cameraId])
   @@index([capturedAt])
+  @@index([batchJobId])
+  @@index([userId])
+  @@index([species])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([manualReviewedAt])
+  @@index([manualReviewStatus])
+  @@index([reviewedById])
+  @@index([cameraId, createdAt])
+  @@index([cameraId, capturedAt])
+  @@index([batchJobId, species])
 }
 
 model BatchJob {
-  id              Int         @id @default(autoincrement())
-  zipName         String
-  status          String      @default("Pendiente")
-  totalImages     Int         @default(0)
-  processedImages Int         @default(0)
-  failedImages    Int         @default(0)
-  error           String?
-  cameraId        Int?
-  camera          Camera?     @relation(fields: [cameraId], references: [id])
-  userId          Int
-  user            User        @relation(fields: [userId], references: [id])
-  detections      Detection[]
-  createdAt       DateTime    @default(now())
-  completedAt     DateTime?
+  id                Int         @id @default(autoincrement())
+  zipName           String
+  status            String      @default("Pendiente")
+  totalImages       Int         @default(0)
+  processedImages   Int         @default(0)
+  failedImages      Int         @default(0)
+  error             String?
+  startedAt         DateTime?
+  heartbeatAt       DateTime?
+  workerId          String?
+  attempts          Int         @default(0)
+  lastError         String?
+  nextRetryAt       DateTime?
+  cancelRequestedAt DateTime?
+  cameraId          Int?
+  camera            Camera?     @relation(fields: [cameraId], references: [id])
+  userId            Int
+  user              User        @relation(fields: [userId], references: [id])
+  detections        Detection[]
+  createdAt         DateTime    @default(now())
+  completedAt       DateTime?
 
   @@index([cameraId])
+  @@index([status])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([completedAt])
+  @@index([cameraId, status])
 }
 
 model User {
-  id           Int         @id @default(autoincrement())
-  name         String
-  email        String      @unique
-  passwordHash String
-  institution  String?
-  role         String      @default("Investigador")
-  createdAt    DateTime    @default(now())
-  detections   Detection[]
-  batchJobs    BatchJob[]
+  id                 Int         @id @default(autoincrement())
+  name               String
+  email              String      @unique
+  passwordHash       String
+  institution        String?
+  role               String      @default("Investigador")
+  createdAt          DateTime    @default(now())
+  detections         Detection[]
+  reviewedDetections Detection[] @relation("DetectionReviewer")
+  batchJobs          BatchJob[]
 }
 
 model Camera {

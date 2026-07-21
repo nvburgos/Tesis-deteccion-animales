@@ -5,13 +5,12 @@ import DetectionResult from './DetectionResult'
 import Header, { type HeaderNotification } from './Header'
 import ManualReviewsPanel from './ManualReviewsPanel'
 import RecentDetections from './RecentDetections'
-import ReportsPanel from './ReportsPanel'
 import Sidebar from './Sidebar'
 import SpeciesGallery from './SpeciesGallery'
 import StatsCards from './StatsCards'
-import SupportUnavailable from './SupportUnavailable'
 import UploadImage from './UploadImage'
 import { getSpeciesLabel, uiText } from '@/lib/i18n'
+import { isPendingManualReview } from '@/lib/manualReviewPolicy'
 import type {
   BatchJob,
   DashboardMetric,
@@ -156,7 +155,6 @@ async function analyzeImage(file: File, language: Language): Promise<DetectionRe
   })
 
   const data = await readJsonResponse<BackendAnalyzeResponse>(response)
-  console.log('Respuesta backend:', data)
 
   if (!response.ok && !data.species) {
     throw new Error(data.error ?? 'No se pudo analizar la imagen')
@@ -325,7 +323,7 @@ export default function Dashboard({ userName }: DashboardProps) {
         tone: 'alert' as const
       }))
     const reviewItems = detections
-      .filter((detection) => detection.priority === 'Revision manual' && !detection.manualReviewedAt)
+      .filter(isPendingManualReview)
       .slice(0, 3)
       .map((detection) => ({
         description:
@@ -458,10 +456,6 @@ export default function Dashboard({ userName }: DashboardProps) {
               onReviewCompleted={handleManualReviewCompleted}
               text={text}
             />
-          ) : activeView === 'reports' ? (
-            <ReportsPanel seedDetections={detections} language={language} text={text} />
-          ) : activeView === 'support' ? (
-            <SupportUnavailable text={text} />
           ) : (
             <>
               <StatsCards metrics={metrics} text={text} />

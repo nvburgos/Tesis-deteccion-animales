@@ -1,8 +1,11 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { ADMIN_ROLE, AUTH_COOKIE, createSessionValue, INVESTIGATOR_ROLE } from '@/lib/auth'
+import { ADMIN_ROLE, AUTH_COOKIE, createSessionValue, getSessionUserId, INVESTIGATOR_ROLE, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { hashPassword } from '@/lib/passwords'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 type RegisterBody = {
   email?: string
@@ -16,6 +19,12 @@ function isPrismaUniqueError(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
+
+  const rateLimit = checkRateLimit('register:' + getClientIp(request), 10, 60 * 60 * 1000)
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Demasiados intentos de registro. Intenta mas tarde.' }, { status: 429 })
+  }
   const body = (await request.json().catch(() => null)) as RegisterBody | null
   const name = body?.name?.trim() ?? ''
   const email = body?.email?.trim().toLowerCase() ?? ''
@@ -33,6 +42,24 @@ export async function POST(request: Request) {
   try {
     await ensureDatabase()
     const userCount = await prisma.user.count()
+    const publicRegistrationAllowed = process.env.ALLOW_PUBLIC_REGISTRATION === 'true'
+    let adminSession = false
+
+    if (userCount > 0 && !publicRegistrationAllowed) {
+      const session = (await cookies()).get(AUTH_COOKIE)?.value
+      const sessionUserId = getSessionUserId(session)
+
+      if (!sessionUserId) {
+        return NextResponse.json({ error: 'Registro publico deshabilitado' }, { status: 403 })
+      }
+
+      const currentUser = await prisma.user.findUnique({ where: { id: sessionUserId }, select: { role: true } })
+      adminSession = isAdminRole(currentUser?.role)
+
+      if (!adminSession) {
+        return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 })
+      }
+    }
 
     const user = await prisma.user.create({
       data: {
@@ -51,6 +78,10 @@ export async function POST(request: Request) {
     })
 
     const response = NextResponse.json({ ok: true, user })
+
+    if (adminSession) {
+      return response
+    }
 
     response.cookies.set({
       name: AUTH_COOKIE,
@@ -72,3 +103,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No se pudo crear el usuario' }, { status: 500 })
   }
 }
+
+
+

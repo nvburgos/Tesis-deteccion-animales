@@ -1,15 +1,23 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { ensureDatabase } from '@/lib/database'
 import { calculatePriority } from '@/lib/detections'
 import { prisma } from '@/lib/prisma'
 import { AUTH_COOKIE, getSessionUserId } from '@/lib/auth'
 import { createDetectionFromPrediction, runPrediction, saveUploadedImage } from '@/lib/predictionRunner'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
+
+  const rateLimit = checkRateLimit('analyze:' + getClientIp(request), 60, 60 * 60 * 1000)
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Demasiadas solicitudes de analisis. Intenta mas tarde.' }, { status: 429 })
+  }
   try {
     const session = (await cookies()).get(AUTH_COOKIE)?.value
     const userId = getSessionUserId(session)
@@ -97,3 +105,5 @@ export async function POST(request: Request) {
     )
   }
 }
+
+

@@ -54,6 +54,12 @@ export type RecentDetection = {
   researcherEmail?: string | null
   manualReviewedAt?: string | null
   manualReviewNote?: string | null
+  manualReviewStatus?: string | null
+  reviewedById?: number | null
+  reviewedBy?: { id: number; name: string; email: string } | null
+  manualOriginalSpecies?: string | null
+  manualCorrectedSpecies?: string | null
+  reviewVersion?: number
   x1?: number | null
   y1?: number | null
   x2?: number | null
@@ -85,6 +91,6 @@ export type BatchJob = {
   camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
 }
 
-export type DashboardView = 'dashboard' | 'map' | 'species' | 'reviews' | 'reports' | 'support'
+export type DashboardView = 'dashboard' | 'species' | 'reviews'
 
 export type { Language }

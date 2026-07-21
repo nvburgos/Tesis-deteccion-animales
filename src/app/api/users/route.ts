@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ADMIN_ROLE, AUTH_COOKIE, getSessionUserId, INVESTIGATOR_ROLE, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
+
   const { error } = await getAdminUser()
 
   if (error) {

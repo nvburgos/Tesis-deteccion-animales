@@ -1029,3 +1029,457 @@ updateMany({
 ```
 
 Si `count` no es `1`, el lote ya fue tomado por otro proceso y el worker no lo procesa.
+## Preparacion para produccion controlada: worker de lotes
+
+El procesamiento ZIP depende de un worker Node independiente. En produccion no debe ejecutarse manualmente como una terminal olvidada; debe estar supervisado por PM2, Windows Service, systemd o Docker Compose, segun el ambiente final.
+
+Comando local:
+
+```bash
+npm run worker:batches
+```
+
+Ejecucion de una sola iteracion para diagnostico:
+
+```bash
+npm run worker:batches -- --once
+```
+
+Variables operativas del worker:
+
+| Variable | Uso | Valor recomendado |
+| --- | --- | --- |
+| `BATCH_STALE_MINUTES` | Minutos sin heartbeat para considerar un lote atascado. | `15` |
+| `MAX_BATCH_ATTEMPTS` | Intentos maximos antes de marcar un lote como `Fallido`. | `3` |
+| `WORKER_HEARTBEAT_SECONDS` | Frecuencia de actualizacion de `heartbeatAt`. | `10` |
+| `WORKER_ID` | Identificador fijo opcional del worker. Si no existe, se genera automaticamente. | vacio |
+
+Campos operativos agregados a `BatchJob`:
+
+```prisma
+startedAt DateTime?
+heartbeatAt DateTime?
+workerId String?
+attempts Int @default(0)
+lastError String?
+nextRetryAt DateTime?
+cancelRequestedAt DateTime?
+```
+
+Comportamiento operativo:
+
+1. El worker busca lotes `Pendiente` cuyo `nextRetryAt` este vacio o vencido.
+2. Reclama el lote atomicamente con `updateMany` usando `id + status`.
+3. Al reclamar asigna `workerId`, `startedAt`, `heartbeatAt`, limpia errores previos e incrementa `attempts`.
+4. Durante el procesamiento actualiza `heartbeatAt` y contadores de progreso.
+5. Si encuentra lotes `Procesando` con heartbeat vencido, los reencola si `attempts < MAX_BATCH_ATTEMPTS`.
+6. Si el lote supera los intentos, lo marca como `Fallido` y guarda el motivo en `lastError`.
+7. No reprocesa lotes `Completado`.
+8. No borra detecciones parciales automaticamente.
+9. Para evitar duplicados, antes de crear una deteccion consulta si ya existe `Detection` para el mismo `batchJobId + imagePath`.
+10. En `SIGINT` o `SIGTERM`, el worker intenta cerrar el proceso Python y deja el lote reencolable o fallido segun los intentos.
+
+Health check protegido:
+
+```text
+GET /api/health
+```
+
+Requiere sesion de administrador. Verifica:
+
+- Next.js activo;
+- conexion a PostgreSQL;
+- migraciones Prisma sin fallos pendientes;
+- existencia del storage configurado;
+- heartbeat reciente del worker;
+- cantidad de lotes pendientes y en procesamiento.
+
+El endpoint no expone credenciales ni rutas fisicas del servidor.
+
+### 2026-07-19
+
+Cambio: Fase 4 del plan de correccion final. Se agregaron campos operativos no destructivos a `BatchJob`, heartbeat, reclamacion atomica con `workerId`, recuperacion de lotes atascados, reintentos controlados, fallo definitivo, cierre por seÃƒÂ±ales, health check protegido y pruebas de politica del worker.
+
+Archivos modificados:
+
+- `prisma/schema.prisma`
+- `prisma/migrations/20260719090000_add_batch_worker_operational_fields/migration.sql`
+- `scripts/batch-worker.js`
+- `scripts/batch-worker-utils.js`
+- `tests/batchWorkerPolicy.test.cjs`
+- `src/app/api/health/route.ts`
+- `src/app/api/batches/[id]/route.ts`
+- `.env.example`
+- `README.md`
+
+Estado: migracion no destructiva aplicada. El worker ahora puede recuperarse de lotes atascados y evita duplicar detecciones mediante comprobacion logica por `batchJobId + imagePath`.
+## Fase 5: paginacion y rendimiento
+
+Se eliminaron cargas ilimitadas del historial global. La pagina `/historial` ya no usa `limit=all`; ahora consulta `GET /api/detections` con paginacion y filtros server-side.
+
+Parametros soportados por `GET /api/detections`:
+
+```text
+page
+pageSize
+cameraId
+researcherId
+species
+date
+batchJobId
+```
+
+Respuesta paginada:
+
+```json
+{
+  "detections": [],
+  "availableSpecies": [],
+  "pagination": {
+    "page": 1,
+    "pageSize": 25,
+    "total": 0,
+    "totalPages": 1
+  }
+}
+```
+
+`GET /api/batches` tambien responde con paginacion:
+
+```text
+page
+pageSize
+cameraId
+```
+
+El resumen de `GET /api/batches/[id]` dejo de cargar todas las detecciones del lote para contar especies y detecciones. Ahora usa consultas agregadas (`count` y `groupBy`) para calcular:
+
+- detecciones con fauna;
+- imagenes sin deteccion;
+- distribucion de especies;
+- especies distintas.
+
+`GET /api/cameras/[id]/stats` usa `groupBy` para especies distintas en lugar de cargar filas completas.
+
+Pendiente recomendado: agregar indices no destructivos sobre columnas usadas por filtros frecuentes. Esa migracion debe aprobarse antes de aplicarse.
+
+### 2026-07-20
+
+Cambio: Fase 5 parcial del plan de correccion final. Se agrego paginacion server-side a historial y lotes, se eliminaron cargas ilimitadas desde `/historial`, y se optimizaron conteos de lote y estadisticas de camara con agregaciones Prisma.
+
+Archivos modificados:
+
+- `src/app/api/detections/route.ts`
+- `src/app/historial/page.tsx`
+- `src/app/api/batches/route.ts`
+- `src/app/api/batches/[id]/route.ts`
+- `src/app/api/cameras/[id]/stats/route.ts`
+- `README.md`
+
+Estado: funcional sin cambios de esquema. Pendiente de aprobacion: migracion no destructiva de indices para consultas frecuentes.
+Migracion de indices aplicada en Fase 5:
+
+```text
+prisma/migrations/20260720090000_add_performance_indexes/migration.sql
+```
+
+Indices agregados:
+
+```text
+Detection.batchJobId
+Detection.userId
+Detection.species
+Detection.priority
+Detection.createdAt
+Detection.manualReviewedAt
+Detection(cameraId, createdAt)
+Detection(cameraId, capturedAt)
+Detection(batchJobId, species)
+BatchJob.status
+BatchJob.userId
+BatchJob.createdAt
+BatchJob.completedAt
+BatchJob(cameraId, status)
+```
+
+La migracion solo ejecuta `CREATE INDEX`. No elimina, renombra ni modifica columnas existentes.
+
+## Fase 6: revisiones manuales y trazabilidad
+
+Se agrego trazabilidad minima no destructiva al modelo `Detection` para registrar el estado formal de revision, el usuario revisor, la especie original, la especie corregida y una version de revision para bloqueo optimista.
+
+Campos agregados a `Detection`:
+
+```prisma
+manualReviewStatus String?
+reviewedById Int?
+reviewedBy User? @relation("DetectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+manualOriginalSpecies String?
+manualCorrectedSpecies String?
+reviewVersion Int @default(0)
+```
+
+Relacion agregada a `User`:
+
+```prisma
+reviewedDetections Detection[] @relation("DetectionReviewer")
+```
+
+Estados soportados:
+
+- `Pendiente`
+- `Confirmada`
+- `Corregida`
+- `Sin fauna`
+- `No evaluable`
+- `Descartada`
+
+Comportamiento del guardado:
+
+1. El frontend envia `reviewVersion` junto con la especie revisada y la observacion.
+2. `PATCH /api/detections` compara esa version con la version actual en PostgreSQL.
+3. Si la version cambio, responde `409 Conflict` con el mensaje `Esta revision fue modificada por otro investigador.`
+4. Si la version coincide, guarda `manualReviewedAt`, `manualReviewStatus`, `reviewedById`, `manualOriginalSpecies`, `manualCorrectedSpecies`, `manualReviewNote` e incrementa `reviewVersion`.
+5. La accion `Descartar imagen` no borra archivos; marca la deteccion como `Descartada` y conserva auditoria.
+
+La clasificacion de estados se centraliza en `src/lib/manualReviewPolicy.ts`. Los modulos de Reportes, Estadisticas, Dashboard y detalle de camara usan la misma regla para contar revisiones pendientes, manteniendo compatibilidad con registros antiguos que solo tienen `priority = "Revision manual"` y `manualReviewedAt = null`.
+
+## Fase 7: calidad, lint y pruebas minimas
+
+Se agrego ESLint con configuracion flat compatible con TypeScript, React y hooks. El script disponible es:
+
+```bash
+npm run lint
+```
+
+El lint analiza:
+
+```text
+src
+scripts
+tests
+next.config.ts
+```
+
+Se excluyen artefactos y dependencias locales como `.next`, `.venv`, `.tmp`, `node_modules`, `storage`, `public/uploads` y migraciones Prisma.
+
+Pruebas automatizadas disponibles:
+
+```bash
+npm test
+```
+
+Cobertura minima actual:
+
+- reglas de clasificacion de detecciones;
+- especies invalidas y `Unknown`;
+- politica de revisiones manuales;
+- seguridad de ZIP;
+- politicas de worker, heartbeat y reintentos;
+- firma y validacion de sesiones;
+- `AUTH_SECRET` obligatorio en produccion;
+- verificacion de origen para mutaciones;
+- rate limiting basico;
+- lectura de IP cliente desde headers de proxy.
+
+Resultado de validacion de Fase 7:
+
+```text
+npm run typecheck -> correcto
+npm run lint -> 0 errores, 3 advertencias de hooks existentes
+npm test -> 23 pruebas correctas
+npm run build -> correcto
+```
+
+Advertencias pendientes no bloqueantes:
+
+- dependencias de `useEffect` en `src/app/historial/page.tsx`;
+- dependencias de `useEffect` en `src/components/ManualReviewsPanel.tsx`.
+
+## Fase 8: dependencias y vulnerabilidades
+
+Auditoria ejecutada:
+
+```bash
+npm audit
+npm outdated
+```
+
+Problema encontrado:
+
+- `postcss < 8.5.10` llegaba como dependencia transitiva de `next@16.2.6`.
+- `npm audit fix --force` proponia bajar Next a `9.3.3`, lo cual no es aceptable porque rompe la arquitectura actual de App Router y Next 16.
+
+Correccion aplicada:
+
+```json
+"overrides": {
+  "postcss": "8.5.20"
+}
+```
+
+Resultado:
+
+```text
+npm ls postcss -> next@16.2.6 usa postcss@8.5.20 overridden
+npm audit -> 0 vulnerabilidades
+npm run typecheck -> correcto
+npm run lint -> 0 errores, 3 advertencias
+npm test -> 23 pruebas correctas
+npm run build -> correcto
+```
+
+No se ejecutaron actualizaciones mayores de Next, Prisma, TypeScript, React ni ESLint 10 para evitar rupturas de compatibilidad antes del piloto controlado.
+
+## Fase 9: documentacion operativa y preparacion de produccion
+
+### Arquitectura operativa
+
+WildlifeAI se ejecuta como cinco piezas coordinadas:
+
+| Capa | Responsabilidad |
+| --- | --- |
+| Next.js App Router | Interfaz, rutas protegidas y API interna. |
+| PostgreSQL | Persistencia de usuarios, camaras, lotes y detecciones. |
+| Prisma | ORM, migraciones y cliente de acceso a datos. |
+| Worker Node | Reclama `BatchJob`, extrae ZIP seguros, ejecuta Python y actualiza progreso. |
+| Python / SpeciesNet | Inferencia de fauna, coordenadas, fecha de captura y salida JSON por imagen. |
+
+### Requisitos de entorno
+
+| Requisito | Recomendacion para piloto controlado |
+| --- | --- |
+| Node.js | Version compatible con Next 16. Verificar con `node --version`. |
+| npm | Usar `npm ci` en despliegue para respetar `package-lock.json`. |
+| Python | Entorno virtual dedicado con dependencias de SpeciesNet instaladas. |
+| PostgreSQL | Base persistente con backups automaticos. |
+| Tesseract | Opcional; requerido solo para OCR de fechas visibles. |
+| CPU/GPU | CPU funciona; GPU CUDA mejora tiempos de SpeciesNet si esta disponible. |
+| Storage | Directorio persistente, no efimero, para uploads y ZIP procesados. |
+
+### Variables de entorno
+
+| Variable | Uso |
+| --- | --- |
+| `DATABASE_URL` | Conexion PostgreSQL usada por Prisma. |
+| `AUTH_SECRET` | Secreto HMAC de sesiones. Obligatorio en produccion. |
+| `ALLOW_PUBLIC_REGISTRATION` | Controla registro publico. Recomendado `false`. |
+| `PYTHON_BIN` | Ejecutable Python usado por Next.js y worker. |
+| `YOLO_MODEL_PATH` | Modelo local de respaldo si aplica. |
+| `STORAGE_ROOT` | Raiz privada de almacenamiento. Recomendado `storage`. |
+| `MAX_ZIP_SIZE_MB` | Tamano maximo del ZIP recibido. |
+| `MAX_ZIP_ENTRIES` | Numero maximo de entradas internas del ZIP. |
+| `MAX_UNCOMPRESSED_SIZE_MB` | Tamano maximo total descomprimido. |
+| `MAX_COMPRESSION_RATIO` | Proteccion contra ZIP bombs. |
+| `BATCH_STALE_MINUTES` | Minutos sin heartbeat para considerar lote atascado. |
+| `MAX_BATCH_ATTEMPTS` | Reintentos maximos antes de marcar `Fallido`. |
+| `WORKER_HEARTBEAT_SECONDS` | Frecuencia de heartbeat del worker. |
+| `WORKER_ID` | Identificador fijo opcional del worker. |
+| `BATCH_WORKER_POLL_MS` | Intervalo de busqueda de lotes pendientes. |
+| `BATCH_WORKER_STEP_WARN_MS` | Umbral para advertir pasos lentos del worker. |
+| `SPECIESNET_ENABLED` | Activa SpeciesNet. |
+| `SPECIESNET_COUNTRY` | Geofence de SpeciesNet. Para Ecuador: `ECU`. |
+| `SPECIESNET_TIMEOUT` | Timeout del analisis individual. |
+| `SPECIESNET_BATCH_SIZE` | Tamano de lote interno para inferencia batch. |
+| `SPECIESNET_BATCH_TIMEOUT_MS` | Timeout operativo del procesamiento batch. |
+| `MEGADETECTOR_ENABLED` | Activa respaldo MegaDetector standalone. |
+| `MEGADETECTOR_MODEL` | Modelo MegaDetector de respaldo. |
+| `MEGADETECTOR_THRESHOLD` | Umbral del detector de respaldo. |
+| `ANALYSIS_MAX_IMAGE_DIMENSION` | Redimensionamiento maximo para analisis individual. |
+| `TESSERACT_CMD` | Ruta/comando de Tesseract si se usa OCR. |
+| `CAPTURE_DATE_FILENAME_FORMAT` | Formato esperado para fecha en nombre de archivo. |
+| `CAPTURE_DATE_OCR_FORMAT` | Formato OCR: `MDY`, `DMY` o `YMD`. |
+
+### Despliegue recomendado
+
+```bash
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+npm start
+```
+
+El worker debe ejecutarse como proceso supervisado separado:
+
+```bash
+npm run worker:batches
+```
+
+Opciones recomendadas segun ambiente:
+
+- Linux: `systemd` o Docker Compose.
+- Windows: PM2 o Windows Service.
+- Contenedores: servicio `web` para Next.js y servicio `worker` para lotes.
+
+No se recomienda depender de una terminal abierta manualmente para produccion.
+
+### Backups
+
+Base de datos:
+
+```bash
+pg_dump "$DATABASE_URL" > wildlifeai_YYYYMMDD.sql
+```
+
+Politica minima para piloto:
+
+- backup diario de PostgreSQL;
+- retencion minima de 7 a 30 dias;
+- prueba de restauracion antes del lanzamiento;
+- backup del directorio `STORAGE_ROOT` junto con la base;
+- documentar responsable y ubicacion de respaldos.
+
+### Uploads y almacenamiento
+
+- Usar `STORAGE_ROOT` en disco persistente.
+- No usar filesystem efimero de serverless para ZIP o imagenes.
+- Servir imagenes mediante `GET /api/files/[detectionId]`, no mediante URL publica directa.
+- Mantener compatibilidad temporal con archivos antiguos en `public/uploads` hasta migrarlos.
+- Validar permisos del directorio para que solo la aplicacion y el worker puedan leer/escribir.
+
+### Logs
+
+Logs esperados:
+
+- API: errores con `console.error`, sin credenciales ni rutas sensibles.
+- Worker: pasos numerados, duracion, heartbeat, memoria y errores completos.
+- Python: eventos JSON por linea para carga de modelo, dispositivo, progreso y resultado por imagen.
+
+Logs temporales removidos o normalizados:
+
+- `[batch-debug]`
+- `[reports]`
+- `[statistics]`
+- `Respuesta backend:`
+
+Pendiente recomendado: introducir `LOG_LEVEL` y logger estructurado antes de produccion completa.
+
+### Health check
+
+Endpoint protegido:
+
+```text
+GET /api/health
+```
+
+Debe usarse para monitorear:
+
+- conectividad PostgreSQL;
+- migraciones pendientes;
+- storage disponible;
+- lotes pendientes/en procesamiento;
+- heartbeat reciente del worker.
+
+### Checklist operativo previo al piloto
+
+- `npm ci` ejecutado sin errores.
+- `npx prisma migrate deploy` aplicado.
+- `npm run build` correcto.
+- `npm audit` en 0 vulnerabilidades criticas/altas/moderadas.
+- Worker supervisado.
+- Backups probados.
+- `STORAGE_ROOT` persistente.
+- `AUTH_SECRET` real configurado.
+- `ALLOW_PUBLIC_REGISTRATION=false` salvo decision explicita.
+- HTTPS/proxy configurado antes de exponer la aplicacion.

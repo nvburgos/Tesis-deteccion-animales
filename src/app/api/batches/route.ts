@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -8,16 +8,20 @@ import type { Prisma } from '@prisma/client'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
-import { sanitizeFilename } from '@/lib/predictionRunner'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const execAsync = promisify(exec)
-const imageExtensionPattern = '\\.(jpg|jpeg|png|webp|bmp)$'
+const execFileAsync = promisify(execFile)
+function sanitizeFilename(filename: string) {
+  return filename.replace(/[^a-zA-Z0-9.-]/g, '-').toLowerCase()
+}
 
-function quotePowerShellLiteral(value: string) {
-  return `'${value.replace(/'/g, "''")}'`
+
+function getStorageRoot() {
+  return path.resolve(process.env.STORAGE_ROOT || path.join(/*turbopackIgnore: true*/ process.cwd(), 'storage'))
 }
 
 async function getCurrentUser() {
@@ -36,19 +40,14 @@ async function getCurrentUser() {
   })
 }
 
-async function countZipImages(zipPath: string) {
-  const command = [
-    'Add-Type -AssemblyName System.IO.Compression.FileSystem',
-    `$zip = [System.IO.Compression.ZipFile]::OpenRead(${quotePowerShellLiteral(zipPath)})`,
-    'try {',
-    `  ($zip.Entries | Where-Object { $_.FullName -match ${quotePowerShellLiteral(imageExtensionPattern)} }).Count`,
-    '} finally {',
-    '  $zip.Dispose()',
-    '}'
-  ].join('; ')
-  const { stdout } = await execAsync(`powershell -NoProfile -Command "${command}"`, { timeout: 120000 })
-  const count = Number(stdout.trim())
-
+async function inspectZip(zipPath: string) {
+  const pythonBin = process.env.PYTHON_BIN || 'python'
+  const { stdout } = await execFileAsync(pythonBin, [path.join(/*turbopackIgnore: true*/ process.cwd(), 'python', 'safe_zip.py'), 'inspect', zipPath], {
+    env: process.env,
+    timeout: 120000
+  })
+  const data = JSON.parse(stdout.trim()) as { imageCount?: number }
+  const count = Number(data.imageCount ?? 0)
   return Number.isFinite(count) && count >= 0 ? count : 0
 }
 
@@ -100,6 +99,8 @@ export async function GET(request: NextRequest) {
   }
 
   const cameraId = Number(request.nextUrl.searchParams.get('cameraId') ?? '')
+  const page = Math.max(1, Number(request.nextUrl.searchParams.get('page') ?? '1') || 1)
+  const pageSize = Math.min(100, Math.max(10, Number(request.nextUrl.searchParams.get('pageSize') ?? '50') || 50))
   const isAdmin = isAdminRole(currentUser.role)
   const where: Prisma.BatchJobWhereInput = isAdmin ? {} : { userId: currentUser.id }
 
@@ -107,34 +108,51 @@ export async function GET(request: NextRequest) {
     where.cameraId = cameraId
   }
 
-  const jobs = await prisma.batchJob.findMany({
-    include: {
-      camera: {
-        select: {
-          code: true,
-          id: true,
-          name: true,
-          zone: true
+  const [total, jobs] = await Promise.all([
+    prisma.batchJob.count({ where }),
+    prisma.batchJob.findMany({
+      include: {
+        camera: {
+          select: {
+            code: true,
+            id: true,
+            name: true,
+            zone: true
+          }
+        },
+        user: {
+          select: {
+            email: true,
+            id: true,
+            name: true
+          }
         }
       },
-      user: {
-        select: {
-          email: true,
-          id: true,
-          name: true
-        }
-      }
-    },
-    orderBy: { createdAt: 'desc' },
-    where
-  })
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      where
+    })
+  ])
 
   return NextResponse.json({
-    jobs: jobs.map(toPublicBatchJob)
+    jobs: jobs.map(toPublicBatchJob),
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize))
+    }
   })
 }
 
 export async function POST(request: NextRequest) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
+
+  const rateLimit = checkRateLimit('batch:' + getClientIp(request), 20, 60 * 60 * 1000)
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Demasiadas cargas de ZIP. Intenta mas tarde.' }, { status: 429 })
+  }
   const currentUser = await getCurrentUser()
 
   if (!currentUser) {
@@ -180,14 +198,14 @@ export async function POST(request: NextRequest) {
     }
   })
 
-  const batchRoot = path.join(process.cwd(), 'public', 'uploads', 'batches', String(job.id))
+  const batchRoot = path.join(getStorageRoot(), 'uploads', 'batches', String(job.id))
   const zipPath = path.join(batchRoot, job.zipName)
 
   try {
     await mkdir(batchRoot, { recursive: true })
     await writeFile(zipPath, Buffer.from(await zip.arrayBuffer()))
 
-    const totalImages = await countZipImages(zipPath)
+    const totalImages = await inspectZip(zipPath)
     const updatedJob = await prisma.batchJob.update({
       data: { totalImages },
       include: {
@@ -219,3 +237,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No se pudo registrar el ZIP' }, { status: 400 })
   }
 }
+
+
+
+
+

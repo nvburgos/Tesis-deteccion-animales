@@ -1,27 +1,24 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ClipboardCheck, FileText, Grid2X2, Headphones, Map, PawPrint, Sprout, Users } from 'lucide-react'
+import { ClipboardCheck, FileText, Grid2X2, PawPrint, Sprout, Users } from 'lucide-react'
 import { uiText, type UiText } from '@/lib/i18n'
 import type { DashboardView } from './dashboardTypes'
 
 const navItems: { labelKey: keyof UiText; icon: typeof Grid2X2; view: DashboardView }[] = [
   { labelKey: 'dashboard', icon: Grid2X2, view: 'dashboard' },
-  { labelKey: 'fieldMap', icon: Map, view: 'map' },
   { labelKey: 'species', icon: PawPrint, view: 'species' },
-  { labelKey: 'reviews', icon: ClipboardCheck, view: 'reviews' },
-  { labelKey: 'reports', icon: FileText, view: 'reports' },
-  { labelKey: 'support', icon: Headphones, view: 'support' }
+  { labelKey: 'reviews', icon: ClipboardCheck, view: 'reviews' }
 ]
 
-const routeItems = [
-  { href: '/cameras', label: 'Panel de Control', icon: Grid2X2 },
+const primaryRouteItems = [{ href: '/cameras', label: 'Panel de Control', icon: Grid2X2 }]
+const secondaryRouteItems = [
+  { href: '/reports', label: 'Reportes', icon: FileText },
   { href: '/historial', label: 'Historial', icon: FileText },
-  { href: '/estadisticas', label: 'Estadisticas', icon: PawPrint }
+  { href: '/statistics', label: 'Estadisticas', icon: PawPrint }
 ]
-
 const adminRouteItem = { href: '/usuarios', label: 'Usuarios', icon: Users }
 
 type SidebarProps = {
@@ -30,21 +27,29 @@ type SidebarProps = {
   text?: UiText
 }
 
-export default function Sidebar({ activeView, onViewChange, text = uiText.es }: SidebarProps) {
+function RouteLink({ href, icon: Icon, label }: { href: string; icon: typeof Grid2X2; label: string }) {
   const pathname = usePathname()
+  const isActive = href === '/cameras' ? pathname === href || pathname.startsWith('/cameras/') : pathname === href
+
+  return (
+    <Link className={isActive ? 'navItem active' : 'navItem'} href={href}>
+      <Icon size={22} />
+      <span>{label}</span>
+    </Link>
+  )
+}
+
+export default function Sidebar({ activeView, onViewChange, text = uiText.es }: SidebarProps) {
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     fetch('/api/detections?limit=1', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: { currentUser?: { role?: string } } | null) => {
-        setIsAdmin(data?.currentUser?.role === 'Admin')
-      })
+      .then((data: { currentUser?: { role?: string } } | null) => setIsAdmin(data?.currentUser?.role === 'Admin'))
       .catch(() => setIsAdmin(false))
   }, [])
 
-  const visibleRouteItems = isAdmin ? [...routeItems, adminRouteItem] : routeItems
-  const secondaryRouteItems = visibleRouteItems.filter((item) => item.href !== '/cameras')
+  const visibleSecondaryRouteItems = isAdmin ? [...secondaryRouteItems, adminRouteItem] : secondaryRouteItems
 
   return (
     <aside className="sidebar" aria-label="Navegacion principal">
@@ -55,53 +60,25 @@ export default function Sidebar({ activeView, onViewChange, text = uiText.es }: 
 
       <nav className="sidebarNav">
         {onViewChange ? (
-          <>
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = item.view === activeView
-              const label = text[item.labelKey]
+          navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = item.view === activeView
+            const label = text[item.labelKey]
 
-              return (
-                <button
-                  aria-current={isActive ? 'page' : undefined}
-                  className={isActive ? 'navItem active' : 'navItem'}
-                  key={item.view}
-                  onClick={() => onViewChange(item.view)}
-                  type="button"
-                >
-                  <Icon size={22} />
-                  <span>{label}</span>
-                </button>
-              )
-            })}
-
-            <div className="navDivider" />
-
-            {secondaryRouteItems.map((item) => {
-              const Icon = item.icon
-              const isActive = item.href === '/cameras' ? pathname === item.href || pathname.startsWith('/cameras/') : pathname === item.href
-
-              return (
-                <Link className={isActive ? 'navItem active' : 'navItem'} href={item.href} key={item.href}>
-                  <Icon size={22} />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })}
-          </>
+            return (
+              <button aria-current={isActive ? 'page' : undefined} className={isActive ? 'navItem active' : 'navItem'} key={item.view} onClick={() => onViewChange(item.view)} type="button">
+                <Icon size={22} />
+                <span>{label}</span>
+              </button>
+            )
+          })
         ) : (
-          visibleRouteItems.map((item) => {
-              const Icon = item.icon
-              const isActive = item.href === '/cameras' ? pathname === item.href || pathname.startsWith('/cameras/') : pathname === item.href
-
-              return (
-                <Link className={isActive ? 'navItem active' : 'navItem'} href={item.href} key={item.href}>
-                  <Icon size={22} />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })
+          primaryRouteItems.map((item) => <RouteLink href={item.href} icon={item.icon} key={item.href} label={item.label} />)
         )}
+
+        <div className="navDivider" />
+
+        {visibleSecondaryRouteItems.map((item) => <RouteLink href={item.href} icon={item.icon} key={item.href} label={item.label} />)}
       </nav>
 
       <div className="researcherCard">
@@ -114,5 +91,3 @@ export default function Sidebar({ activeView, onViewChange, text = uiText.es }: 
     </aside>
   )
 }
-
-

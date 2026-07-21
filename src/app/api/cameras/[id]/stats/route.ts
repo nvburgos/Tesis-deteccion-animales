@@ -1,8 +1,9 @@
-﻿import { cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { invalidSpeciesValues } from '@/lib/detectionClassification'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,15 +56,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const userFilter = isAdminRole(currentUser.role) ? {} : { userId: currentUser.id }
     const detectionWhere = { cameraId, ...userFilter }
     const completedBatchWhere = { cameraId, status: 'Completado', ...userFilter }
-    const excludedSpecies = [
-      'Sin deteccion',
-      'Sin detecci\u00f3n',
-      'No CV Result',
-      'no cv result',
-      'Unknown',
-      'unknown',
-      ''
-    ]
+    const excludedSpecies = invalidSpeciesValues
     const faunaDetectionWhere = {
       ...detectionWhere,
       species: { notIn: excludedSpecies },
@@ -81,9 +74,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       prisma.detection.count({
         where: faunaDetectionWhere
       }),
-      prisma.detection.findMany({
-        distinct: ['species'],
-        select: { species: true },
+      prisma.detection.groupBy({
+        by: ['species'],
         where: faunaDetectionWhere
       }),
       prisma.detection.count({
@@ -91,7 +83,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
           ...detectionWhere,
           OR: [
             { species: { in: excludedSpecies } },
-            { confidence: 0 }
+            { confidence: { lte: 0 } }
           ]
         }
       })
@@ -109,3 +101,4 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: 'No se pudieron cargar las estadisticas de la camara' }, { status: 500 })
   }
 }
+

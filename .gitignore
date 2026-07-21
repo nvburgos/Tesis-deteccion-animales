@@ -64,3 +64,4 @@ prisma/dev.db
 
 .tmp/
 public/uploads/
+storage/

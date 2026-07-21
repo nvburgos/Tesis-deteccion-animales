@@ -1,8 +1,9 @@
-﻿import { cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,11 +105,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!verifySameOrigin(request)) return forbiddenByCsrf()
   try {
     const currentUser = await getCurrentUser()
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 })
+    }
+
+    if (!isAdminRole(currentUser.role)) {
+      return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 })
     }
 
     const payload = cleanCameraPayload(await request.json().catch(() => null))
@@ -150,3 +156,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No se pudo crear la camara' }, { status: 500 })
   }
 }
+
+
+
+

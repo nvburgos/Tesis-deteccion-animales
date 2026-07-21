@@ -4,8 +4,10 @@ import type { Prisma } from '@prisma/client'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
+import { toProtectedDetectionImagePath } from '@/lib/fileStorage'
 import { getSpeciesLabel } from '@/lib/i18n'
-import { getTaxonomicGroup, isFaunaSpecies, normalizeTaxonomyKey } from '@/lib/speciesTaxonomy'
+import { getTaxonomicGroup, normalizeTaxonomyKey } from '@/lib/speciesTaxonomy'
+import { invalidSpeciesValues, isPositiveFaunaDetection } from '@/lib/detectionClassification'
 import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 
 export const dynamic = 'force-dynamic'
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     const where: Prisma.DetectionWhereInput = {
       cameraId,
       confidence: { gt: 0 },
-      species: { notIn: ['Sin deteccion', 'Sin detección', 'No CV Result', 'no cv result', 'Unknown', 'unknown', ''] }
+      species: { notIn: invalidSpeciesValues }
     }
 
     if (!isAdminRole(currentUser.role)) where.userId = currentUser.id
@@ -104,7 +106,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
     const summaries = new Map<string, Summary>()
     detections.forEach((detection) => {
-      if (!isFaunaSpecies(detection.species, detection.confidence)) return
+      if (!isPositiveFaunaDetection(detection.species, detection.confidence)) return
       const speciesLabel = getSpeciesLabel(detection.species, 'es')
       const taxonomicGroup = getTaxonomicGroup(detection.species)
       const normalizedSearchTarget = normalizeTaxonomyKey(`${detection.species} ${speciesLabel}`)
@@ -115,7 +117,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         averageConfidence: 0,
         confidenceTotal: 0,
         firstCapturedAt: null,
-        imagePath: detection.imagePath,
+        imagePath: String(detection.id),
         lastCapturedAt: null,
         pendingReviews: 0,
         records: 0,
@@ -136,7 +138,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         if (!current.firstCapturedAt || capturedAt < current.firstCapturedAt) current.firstCapturedAt = capturedAt
         if (!current.lastCapturedAt || capturedAt > current.lastCapturedAt) {
           current.lastCapturedAt = capturedAt
-          current.imagePath = detection.imagePath || current.imagePath
+          current.imagePath = String(detection.id)
         }
       }
       summaries.set(detection.species, current)
@@ -155,7 +157,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       species: getSpeciesLabel(item.species, 'es'),
       speciesKey: encodeURIComponent(item.species),
       taxonomicGroup: item.taxonomicGroup,
-      thumbnail: item.imagePath
+      thumbnail: toProtectedDetectionImagePath(Number(item.imagePath))
     }))
 
     if (sort === 'recent') rows = rows.sort((a, b) => new Date(b.lastDetectedAt ?? 0).getTime() - new Date(a.lastDetectedAt ?? 0).getTime())
@@ -190,3 +192,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ error: 'No se pudo cargar el analisis de especies' }, { status: 500 })
   }
 }
+
+

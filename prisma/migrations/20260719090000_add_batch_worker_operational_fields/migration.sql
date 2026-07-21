@@ -1,0 +1,8 @@
+ALTER TABLE "BatchJob"
+  ADD COLUMN "startedAt" TIMESTAMP(3),
+  ADD COLUMN "heartbeatAt" TIMESTAMP(3),
+  ADD COLUMN "workerId" TEXT,
+  ADD COLUMN "attempts" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "lastError" TEXT,
+  ADD COLUMN "nextRetryAt" TIMESTAMP(3),
+  ADD COLUMN "cancelRequestedAt" TIMESTAMP(3);
