@@ -1,8 +1,29 @@
-import { isValidSpecies, normalizeSpeciesName } from './detectionClassification'
+import { isPositiveDetection, normalizeSpeciesName } from './detectionClassification'
+import { normalizeTaxonomyKey } from './speciesTaxonomy'
 
 export const manualReviewStatuses = ['Pendiente', 'Confirmada', 'Corregida', 'Sin fauna', 'No evaluable', 'Descartada'] as const
 
 export type ManualReviewStatus = (typeof manualReviewStatuses)[number]
+
+export const REVIEW_PRIORITY = 'Revision manual'
+export const PENDING_REVIEW_STATUS = 'Pendiente'
+
+const normalizedStatusMap = new Map<string, ManualReviewStatus>([
+  ['pendiente', 'Pendiente'],
+  ['confirmada', 'Confirmada'],
+  ['corregida', 'Corregida'],
+  ['sin fauna', 'Sin fauna'],
+  ['no evaluable', 'No evaluable'],
+  ['descartada', 'Descartada']
+])
+
+const normalizedPriorityMap = new Map<string, string>([
+  ['revision manual', REVIEW_PRIORITY],
+  ['manual review', REVIEW_PRIORITY],
+  ['alta prioridad', 'Alta prioridad'],
+  ['high priority', 'Alta prioridad'],
+  ['normal', 'Normal']
+])
 
 type ReviewStatusInput = {
   originalSpecies?: string | null
@@ -10,13 +31,30 @@ type ReviewStatusInput = {
   explicitStatus?: string | null
 }
 
+export type PendingManualReviewInput = {
+  confidence?: number | null
+  manualReviewedAt?: unknown
+  manualReviewStatus?: string | null
+  priority?: string | null
+  species?: string | null
+}
+
+export function normalizeReviewStatus(value?: string | null): ManualReviewStatus | null {
+  return normalizedStatusMap.get(normalizeTaxonomyKey(value)) ?? null
+}
+
+export function normalizePriority(value?: string | null) {
+  return normalizedPriorityMap.get(normalizeTaxonomyKey(value)) ?? (value?.trim() || '')
+}
+
 export function isManualReviewStatus(value?: string | null): value is ManualReviewStatus {
-  return manualReviewStatuses.includes(value as ManualReviewStatus)
+  return normalizeReviewStatus(value) !== null
 }
 
 export function getManualReviewStatus(input: ReviewStatusInput): ManualReviewStatus {
-  if (isManualReviewStatus(input.explicitStatus)) {
-    return input.explicitStatus
+  const explicitStatus = normalizeReviewStatus(input.explicitStatus)
+  if (explicitStatus) {
+    return explicitStatus
   }
 
   const reviewedSpecies = input.reviewedSpecies?.trim()
@@ -35,7 +73,7 @@ export function getManualReviewStatus(input: ReviewStatusInput): ManualReviewSta
     return 'No evaluable'
   }
 
-  if (!isValidSpecies(reviewedSpecies)) {
+  if (!isPositiveDetection({ species: reviewedSpecies, confidence: 1 })) {
     return 'Corregida'
   }
 
@@ -43,10 +81,21 @@ export function getManualReviewStatus(input: ReviewStatusInput): ManualReviewSta
   return normalizedOriginal === normalizedReviewed ? 'Confirmada' : 'Corregida'
 }
 
-export function isPendingManualReview(detection: { manualReviewStatus?: string | null; manualReviewedAt?: unknown; priority?: string | null }) {
-  if (detection.manualReviewStatus) {
-    return detection.manualReviewStatus === 'Pendiente'
+export function isTerminalManualReviewStatus(value?: string | null) {
+  const status = normalizeReviewStatus(value)
+  return Boolean(status && status !== 'Pendiente')
+}
+
+export function isPendingManualReview(detection: PendingManualReviewInput) {
+  const status = normalizeReviewStatus(detection.manualReviewStatus)
+
+  if (status) {
+    return status === 'Pendiente'
   }
 
-  return detection.priority === 'Revision manual' && !detection.manualReviewedAt
+  if (detection.manualReviewedAt) {
+    return false
+  }
+
+  return normalizePriority(detection.priority) === REVIEW_PRIORITY || !isPositiveDetection(detection)
 }

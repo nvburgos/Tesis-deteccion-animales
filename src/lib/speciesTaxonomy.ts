@@ -103,3 +103,46 @@ export function getSpeciesSuggestion(value: string | null | undefined) {
   const normalized = normalizeTaxonomyKey(value)
   return speciesSuggestions.find((suggestion) => normalizeTaxonomyKey(suggestion.value) === normalized || normalizeTaxonomyKey(suggestion.label) === normalized)
 }
+
+export type IdentificationLevel = 'species' | 'family' | 'genus' | 'general' | 'taxonomic_group' | 'unclassified'
+
+const generalTaxonTerms = new Set([
+  'mammal',
+  'bird',
+  'reptile',
+  'amphibian',
+  'insect',
+  'ave',
+  'mamifero',
+  'mamifero',
+  'reptil',
+  'anfibio',
+  'insecto'
+])
+
+export function getIdentificationLevel(species: string | null | undefined): IdentificationLevel {
+  const normalized = normalizeTaxonomyKey(species)
+
+  if (!normalized || noClassificationTerms.has(normalized)) {
+    return 'unclassified'
+  }
+
+  if (normalized.endsWith(' family') || normalized.includes(' family')) {
+    return 'family'
+  }
+
+  if (normalized.endsWith(' species') || normalized.includes(' species')) {
+    return 'genus'
+  }
+
+  if (generalTaxonTerms.has(normalized)) {
+    return 'general'
+  }
+
+  const group = getTaxonomicGroup(species)
+  if (group !== 'Sin clasificar' && normalizeTaxonomyKey(species) === normalizeTaxonomyKey(group)) {
+    return 'taxonomic_group'
+  }
+
+  return 'species'
+}

@@ -23,26 +23,30 @@ type BatchDetailResponse = {
     totalImages: number
     processedImages: number
     failedImages: number
+    completedImages?: number
     pendingImages: number
     percentage: number | null
     detectionsFound: number
+    withoutDetection?: number
+    elapsedSeconds?: number | null
+    queueSeconds?: number | null
+    imagesPerMinute?: number | null
+    averageSecondsPerImage?: number | null
+    estimatedRemainingSeconds?: number | null
+    stage?: string
     createdAt: string
     completedAt: string | null
+    attempts?: number
+    heartbeatAt?: string | null
+    lastError?: string | null
+    nextRetryAt?: string | null
+    startedAt?: string | null
+    workerId?: string | null
+    stageUpdatedAt?: string | null
+    pythonStage?: string | null
   }
 }
 
-function formatElapsed(createdAt?: string | null, completedAt?: string | null) {
-  if (!createdAt) {
-    return '-'
-  }
-
-  const end = completedAt ? new Date(completedAt).getTime() : Date.now()
-  const seconds = Math.max(0, Math.floor((end - new Date(createdAt).getTime()) / 1000))
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-
-  return minutes > 0 ? `${minutes} min ${remainingSeconds} s` : `${remainingSeconds} s`
-}
 
 function formatCompletedDuration(createdAt?: string | null, completedAt?: string | null) {
   if (!createdAt || !completedAt) {
@@ -65,6 +69,21 @@ function getElapsedSeconds(createdAt?: string | null, completedAt?: string | nul
   return Math.max(0, Math.floor((end - new Date(createdAt).getTime()) / 1000))
 }
 
+function formatDecimal(value: number) {
+  return value.toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 })
+}
+
+function formatEta(seconds: number | null | undefined) {
+  if (seconds === null || seconds === undefined) {
+    return 'Calculando...'
+  }
+
+  if (seconds < 60) {
+    return 'Menos de 1 min'
+  }
+
+  return `Aprox. ${formatRemaining(seconds)}`
+}
 function formatRemaining(seconds: number | null) {
   if (seconds === null) {
     return '-'
@@ -77,6 +96,19 @@ function formatRemaining(seconds: number | null) {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
   return remainingSeconds > 0 ? `${minutes} min ${remainingSeconds} s` : `${minutes} min`
+}
+
+function formatSince(value?: string | null) {
+  if (!value) {
+    return '-'
+  }
+
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000))
+  if (seconds < 60) {
+    return `hace ${seconds} s`
+  }
+
+  return `hace ${formatRemaining(seconds)}`
 }
 
 function getStatusLabel(status?: string, totalImages = 0) {
@@ -93,6 +125,23 @@ function getStatusLabel(status?: string, totalImages = 0) {
 
 function isTerminalStatus(status?: string) {
   return status === 'Completado' || status === 'Con errores' || status === 'Fallido' || status === 'Cancelado'
+}
+
+function getWorkerStartupWarning(job: BatchJob | null, elapsedSeconds: number) {
+  if (!job || isTerminalStatus(job.status)) {
+    return ''
+  }
+
+  if (job.lastError) {
+    return `El procesamiento no pudo continuar: ${job.lastError}`
+  }
+
+  const hasWorkerActivity = Boolean(job.startedAt || job.heartbeatAt || job.workerId)
+  if (job.status === 'Pendiente' && !hasWorkerActivity && elapsedSeconds >= 60) {
+    return 'El lote fue creado, pero el worker de procesamiento no ha tomado la tarea. Inicia npm run worker:batches o revisa el health check del worker.'
+  }
+
+  return ''
 }
 
 async function loadBatchDetail(batchId: number) {
@@ -169,14 +218,21 @@ export default function BatchProgress({
   const total = job?.totalImages ?? 0
   const processed = job?.processedImages ?? 0
   const failed = job?.failedImages ?? 0
-  const completed = processed + failed
+  const completed = job?.completedImages ?? processed + failed
   const pending = job?.pendingImages ?? Math.max(0, total - completed)
-  const percent = job?.percentage ?? (total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : null)
+  const percent = job?.percentage ?? (total > 0 ? Math.min(100, (completed / total) * 100) : null)
+  const visiblePercent = percent === null ? null : Math.round(percent)
   const status = getStatusLabel(job?.status ?? (isProcessing ? 'Procesando' : 'Pendiente'), total)
-  const elapsedSeconds = getElapsedSeconds(job?.createdAt, job?.completedAt)
-  const elapsed = formatElapsed(job?.createdAt, job?.completedAt)
-  const speed = elapsedSeconds > 0 && completed > 0 ? Math.round((completed / elapsedSeconds) * 60) : 0
-  const remainingSeconds = speed > 0 && pending > 0 ? Math.ceil((pending / speed) * 60) : null
+  const elapsedSeconds = job?.elapsedSeconds ?? getElapsedSeconds(job?.startedAt, job?.completedAt)
+  const workerStartupWarning = getWorkerStartupWarning(job, getElapsedSeconds(job?.createdAt, job?.completedAt))
+  const elapsed = elapsedSeconds > 0 ? formatRemaining(elapsedSeconds) : '-'
+  const imagesPerMinute = job?.imagesPerMinute ?? null
+  const remainingSeconds = job?.estimatedRemainingSeconds ?? null
+  const stage = job?.stage ?? status
+  const currentDetectionsFound = job?.detectionsFound ?? detectionsFound
+  const withoutDetection = job?.withoutDetection ?? Math.max(0, processed - currentDetectionsFound)
+  const workerActivity = formatSince(job?.heartbeatAt)
+  const stageAge = formatSince(job?.stageUpdatedAt)
   const isTerminal = isTerminalStatus(job?.status)
   const isCompleted = job?.status === 'Completado'
   const completedDuration = formatCompletedDuration(job?.createdAt, job?.completedAt)
@@ -210,12 +266,13 @@ export default function BatchProgress({
           <Activity size={23} />
         </span>
         <div>
-          <h2>{isTerminalStatus(job?.status) ? 'Procesamiento finalizado' : status}</h2>
+          <h2>{isTerminalStatus(job?.status) ? 'Procesamiento finalizado' : 'Procesando lote'}</h2>
           <p>{job?.zipName ?? zipName ?? 'Lote seleccionado'}</p>
         </div>
       </div>
 
       {pollingError ? <div className="statusBanner">{pollingError}</div> : null}
+      {workerStartupWarning ? <div className="statusBanner statusBannerWarning">{workerStartupWarning}</div> : null}
 
       <div className="batchProgressHero">
         <strong>
@@ -223,12 +280,12 @@ export default function BatchProgress({
             ? `${processed.toLocaleString('es-ES')} de ${total.toLocaleString('es-ES')} imagenes`
             : 'Preparando archivos'}
         </strong>
-        {percent === null ? <span className="preparingLabel">Sin porcentaje</span> : <span className="progressPercentBadge">{percent}%</span>}
+        {visiblePercent === null ? <span className="preparingLabel">Sin porcentaje</span> : <span className="progressPercentBadge">{visiblePercent}%</span>}
       </div>
       {percent !== null ? (
-        <div className="batchProgressTrack" aria-label={`Avance ${percent}%`}>
-          <span style={{ width: `${percent}%` }} />
-          <strong>{percent}%</strong>
+        <div className="batchProgressTrack" aria-label={`Avance ${visiblePercent}%`}>
+          <span style={{ width: `${Math.min(100, percent)}%` }} />
+          <strong>{visiblePercent}%</strong>
         </div>
       ) : null}
 
@@ -237,13 +294,15 @@ export default function BatchProgress({
         <div><span>Procesadas</span><strong>{processed.toLocaleString('es-ES')}</strong></div>
         <div><span>Pendientes</span><strong>{total > 0 ? pending.toLocaleString('es-ES') : '-'}</strong></div>
         <div><span>Fallidas</span><strong>{failed.toLocaleString('es-ES')}</strong></div>
-        <div><span>Detecciones</span><strong>{detectionsFound.toLocaleString('es-ES')}</strong></div>
-        <div><span>Tiempo transcurrido</span><strong>{elapsed}</strong></div>
-        <div><span><Gauge size={14} /> Velocidad</span><strong>{speed > 0 ? `${speed.toLocaleString('es-ES')} imagenes/min` : '-'}</strong></div>
-        <div><span><TimerReset size={14} /> Tiempo restante</span><strong>{formatRemaining(remainingSeconds)}</strong></div>
-        <div><span>Estado</span><strong>{status}</strong></div>
+        <div><span>Detecciones con fauna</span><strong>{currentDetectionsFound.toLocaleString('es-ES')}</strong></div>
+        <div><span>Sin deteccion</span><strong>{withoutDetection.toLocaleString('es-ES')}</strong></div>
+        <div><span>Tiempo de procesamiento</span><strong>{elapsed}</strong></div>
+        <div><span><Gauge size={14} /> Velocidad</span><strong>{imagesPerMinute ? `${formatDecimal(imagesPerMinute)} img/min` : 'Calculando...'}</strong></div>
+        <div><span><TimerReset size={14} /> Tiempo restante estimado</span><strong>{formatEta(remainingSeconds)}</strong></div>
+        <div><span>Etapa</span><strong>{stage}</strong></div>
+        <div><span>Actividad worker</span><strong>{workerActivity}</strong></div>
+        <div><span>Tiempo en etapa</span><strong>{stageAge}</strong></div>
       </div>
     </section>
   )
 }
-

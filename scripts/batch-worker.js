@@ -1,5 +1,5 @@
 const { execFile, spawn } = require('node:child_process')
-const { copyFile, mkdir, readdir, rm } = require('node:fs/promises')
+const { copyFile, mkdir, readdir, rm, writeFile } = require('node:fs/promises')
 const { existsSync } = require('node:fs')
 const path = require('node:path')
 const readline = require('node:readline')
@@ -17,6 +17,7 @@ const execFileAsync = promisify(execFile)
 const imageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp'])
 const pollIntervalMs = Number(process.env.BATCH_WORKER_POLL_MS || 3000)
 const speciesNetBatchSize = Number(process.env.SPECIESNET_BATCH_SIZE || 8)
+const progressMicrobatchSize = Number(process.env.PROGRESS_MICROBATCH_SIZE || 1)
 const batchTimeoutMs = Number(process.env.SPECIESNET_BATCH_TIMEOUT_MS || 0)
 const runOnce = process.argv.includes('--once')
 const stepWarnMs = Number(process.env.BATCH_WORKER_STEP_WARN_MS || 20000)
@@ -93,6 +94,23 @@ function getBatchRoot(jobId) {
   const storageRoot = path.join(getStorageRoot(), 'uploads', 'batches', String(jobId))
   const publicRoot = path.join(process.cwd(), 'public', 'uploads', 'batches', String(jobId))
   return existsSync(storageRoot) || !existsSync(publicRoot) ? storageRoot : publicRoot
+}
+function getProgressStatePath(batchRoot) {
+  return path.join(batchRoot, '.progress.json')
+}
+
+async function writeProgressState(batchRoot, state) {
+  const payload = { ...state, updatedAt: new Date().toISOString() }
+  await writeFile(getProgressStatePath(batchRoot), JSON.stringify(payload, null, 2), 'utf8')
+    .catch((error) => logException('[batch-worker] No se pudo escribir estado de progreso', error))
+}
+
+function mapPythonStage(event) {
+  if (event.stage === 'starting_python') return 'Inicializando Python'
+  if (event.stage === 'loading_speciesnet') return 'Cargando modelo de inteligencia artificial'
+  if (event.stage === 'model_ready') return 'Modelo cargado. Procesando imagenes'
+  if (event.stage === 'processing_images') return event.message || 'Procesando imagenes'
+  return event.message || event.stage || 'Procesando'
 }
 
 function toStoredImagePath(diskPath) {
@@ -382,11 +400,11 @@ async function ensureNotCancelled(jobId) {
   }
 }
 
-async function runSpeciesNetBatch({ existingProcessed, job, preparedImages, preparedDir, location }) {
+async function runSpeciesNetBatch({ batchRoot, existingProcessed, job, preparedImages, preparedDir, location }) {
   const pythonBin = process.env.PYTHON_BIN || 'python'
   const scriptPath = path.join(process.cwd(), 'python', 'predict_batch.py')
   const imageByDiskPath = new Map(preparedImages.map((image) => [path.resolve(image.diskPath), image]))
-  const args = [scriptPath, preparedDir, '--batch-size', String(Number.isFinite(speciesNetBatchSize) && speciesNetBatchSize > 0 ? speciesNetBatchSize : 8)]
+  const args = ['-u', scriptPath, preparedDir, '--batch-size', String(Number.isFinite(speciesNetBatchSize) && speciesNetBatchSize > 0 ? speciesNetBatchSize : 8), '--microbatch-size', String(Number.isFinite(progressMicrobatchSize) && progressMicrobatchSize > 0 ? progressMicrobatchSize : 1)]
   const env = { ...process.env, SPECIESNET_COUNTRY: process.env.SPECIESNET_COUNTRY || 'ECU', PYTHONUNBUFFERED: '1' }
   const spawnStart = performance.now()
   let firstLineLogged = false
@@ -439,19 +457,33 @@ async function runSpeciesNetBatch({ existingProcessed, job, preparedImages, prep
         continue
       }
 
+      if (event.type === 'stage') {
+        const stage = mapPythonStage(event)
+        console.log(`[12] Etapa Python: ${stage}`)
+        await writeProgressState(batchRoot, { stage, pythonStage: event.stage, totalImages: event.total ?? job.totalImages })
+        continue
+      }
+
       if (event.type === 'start') {
         console.log(`[12] Dispositivo: ${event.device}`)
         console.log(`[12] Procesando lote con ${event.total} imagenes`)
+        await writeProgressState(batchRoot, { stage: 'Cargando modelo de inteligencia artificial', pythonStage: 'loading_speciesnet', totalImages: event.total })
         continue
       }
 
       if (event.type === 'model_loaded') {
         console.log(`[12] SpeciesNet cargado en ${event.seconds} segundos | device=${event.device}`)
+        await writeProgressState(batchRoot, { stage: 'Modelo cargado. Procesando imagenes', pythonStage: 'model_ready', totalImages: job.totalImages, modelLoadSeconds: event.seconds })
+        continue
+      }
+
+      if (event.type === 'complete' || event.type === 'done') {
+        await writeProgressState(batchRoot, { stage: 'Finalizando lote', pythonStage: event.type, totalImages: event.total ?? job.totalImages })
         continue
       }
 
       if (event.type === 'fatal') throw new Error(event.error || 'SpeciesNet batch fatal error')
-      if (event.type !== 'prediction') continue
+      if (event.type !== 'prediction' && event.type !== 'result') continue
 
       await ensureNotCancelled(job.id)
       const totalTarget = job.totalImages || existingProcessed + preparedImages.length || event.total || 0
@@ -493,6 +525,7 @@ async function runSpeciesNetBatch({ existingProcessed, job, preparedImages, prep
         data: { failedImages, heartbeatAt: new Date(), processedImages },
         where: { id: job.id, status: 'Procesando', workerId: workerConfig.workerId }
       }), `processed=${processedImages} failed=${failedImages}`)
+      await writeProgressState(batchRoot, { stage: `Procesando imagen ${processedImages + failedImages} de ${totalTarget}`, pythonStage: 'processing_images', processedImages, failedImages, totalImages: totalTarget })
 
       const imageSeconds = (performance.now() - lastImageAt) / 1000
       const totalCompleted = processedImages + failedImages
@@ -535,12 +568,14 @@ async function processJob(job) {
   activeHeartbeatStop = startHeartbeat(job.id)
 
   try {
+    await writeProgressState(batchRoot, { stage: 'Preparando ZIP', pythonStage: 'preparing_zip', totalImages: job.totalImages })
     await withStep(4, 'Verificando ZIP', async () => {
       if (!existsSync(zipPath)) throw new Error(`No existe el ZIP del lote: ${zipPath}`)
     }, zipPath)
     console.log(`[5] ZIP abierto correctamente path=${zipPath}`)
 
     await withStep(6, 'Limpiando carpeta de extraccion previa', () => rm(extractDir, { force: true, recursive: true }).catch(() => undefined), extractDir)
+    await writeProgressState(batchRoot, { stage: 'Extrayendo archivos', pythonStage: 'extracting_zip', totalImages: job.totalImages })
     await extractZip(zipPath, extractDir)
 
     const imageFiles = await withStep(7, 'Contando imagenes', () => listImageFiles(extractDir), extractDir)
@@ -570,6 +605,7 @@ async function processJob(job) {
     }
 
     const existingImagePaths = await withStep(11, 'Consultando detecciones existentes del lote', () => getExistingImagePaths(job.id), `id=${job.id}`)
+    await writeProgressState(batchRoot, { stage: 'Preparando imagenes', pythonStage: 'preparing_images', totalImages: imageFiles.length })
     const { failedCopies, preparedImages, skippedExisting } = await prepareImagesForPrediction(imageFiles, preparedDir, job.id, existingImagePaths)
     await withStep(16, 'Actualizando progreso inicial', () => prisma.batchJob.updateMany({ data: { failedImages: failedCopies, heartbeatAt: new Date(), processedImages: skippedExisting }, where: { id: job.id, status: 'Procesando', workerId: workerConfig.workerId } }), `existing=${skippedExisting} failedCopies=${failedCopies}`)
 
@@ -582,7 +618,8 @@ async function processJob(job) {
       return
     }
 
-    const result = await runSpeciesNetBatch({ existingProcessed: skippedExisting, job, location, preparedDir, preparedImages })
+    await writeProgressState(batchRoot, { stage: 'Cargando modelo de inteligencia artificial', pythonStage: 'loading_speciesnet', totalImages: job.totalImages })
+    const result = await runSpeciesNetBatch({ batchRoot, existingProcessed: skippedExisting, job, location, preparedDir, preparedImages })
     const status = result.failedImages > 0 ? 'Con errores' : 'Completado'
 
     await withStep(18, 'Finalizando lote', () => prisma.batchJob.updateMany({

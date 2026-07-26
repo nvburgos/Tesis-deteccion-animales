@@ -11,6 +11,7 @@ export const invalidSpeciesValues = [
   'Sin detección',
   'No Detection',
   'No CV Result',
+  'No Cv Result',
   'Unknown',
   'Desconocido',
   'Imagen no evaluable',

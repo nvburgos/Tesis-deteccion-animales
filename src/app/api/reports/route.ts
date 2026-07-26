@@ -6,7 +6,7 @@ import { ensureDatabase } from '@/lib/database'
 import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 import { prisma } from '@/lib/prisma'
 import { invalidSpeciesValues, isPositiveFaunaDetection, isValidSpecies, isWithoutDetectionResult } from '@/lib/detectionClassification'
-import { isPendingManualReview } from '@/lib/manualReviewPolicy'
+import { isPendingManualReview, isTerminalManualReviewStatus } from '@/lib/manualReviewPolicy'
 import { getTaxonomicGroup, normalizeTaxonomyKey, type TaxonomicGroup } from '@/lib/speciesTaxonomy'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 
@@ -112,7 +112,7 @@ function isExcludedSpecies(species: string | null | undefined) {
 function reviewStatusMatches(detection: { manualReviewStatus?: string | null; manualReviewedAt: Date | null; priority: string }, status: string) {
   if (!status || status === 'all') return true
   if (status === 'pending') return isPendingManualReview(detection)
-  if (status === 'reviewed') return Boolean(detection.manualReviewedAt) || Boolean(detection.manualReviewStatus && detection.manualReviewStatus !== 'Pendiente')
+  if (status === 'reviewed') return Boolean(detection.manualReviewedAt) || isTerminalManualReviewStatus(detection.manualReviewStatus)
   if (status === 'unreviewed') return !detection.manualReviewedAt && !detection.manualReviewStatus
   return true
 }

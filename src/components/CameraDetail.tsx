@@ -33,6 +33,8 @@ import type {
 type DashboardData = {
   metrics: DashboardMetric[]
   detections: RecentDetection[]
+  items?: RecentDetection[]
+  summary?: { pending: number }
 }
 
 type BackendAnalyzeResponse = Partial<DetectionResultData> & {
@@ -64,6 +66,7 @@ type BatchAnalyzeResponse = {
 type BatchDetailResponse = {
   error?: string
   job?: BatchJob
+  progress?: Partial<BatchJob>
   summary?: BatchSummaryData
   detections?: RecentDetection[]
   pagination?: {
@@ -106,7 +109,7 @@ function normalizePriority(priority?: string, species?: string | null, confidenc
     return 'Alta prioridad'
   }
 
-  if (priority === 'Revision manual' || priority === 'RevisiÃƒÂ³n manual') {
+  if (priority === 'Revision manual' || priority === 'Revisión manual') {
     return 'Revision manual'
   }
 
@@ -220,6 +223,20 @@ async function loadDetections(cameraId: number): Promise<DashboardData> {
   }
 }
 
+
+async function loadPendingReviewDetections(cameraId: number): Promise<RecentDetection[]> {
+  const response = await fetch(`/api/detections?cameraId=${cameraId}&review=pending&pageSize=100`, { cache: 'no-store' })
+
+  if (!response.ok) {
+    throw new Error('No se pudieron cargar las revisiones pendientes')
+  }
+
+  const data = await readJsonResponse<DashboardData>(response)
+  const items = data.items ?? data.detections ?? []
+
+  return items.map(normalizeDetection)
+}
+
 async function loadCameraStats(cameraId: number): Promise<CameraStatsResponse> {
   const response = await fetch(`/api/cameras/${cameraId}/stats`, { cache: 'no-store' })
   const data = await readJsonResponse<CameraStatsResponse>(response)
@@ -291,6 +308,13 @@ async function analyzeBatch(file: File, camera: CameraSummary): Promise<BatchJob
   const job = createPendingBatchFromResponse(file, camera, data)
   return job
 }
+function mergeBatchProgress(data: BatchDetailResponse) {
+  if (!data.job) {
+    return null
+  }
+
+  return data.progress ? { ...data.job, ...data.progress } : data.job
+}
 async function loadBatchDetail(batchId: number, page: number, filters: BatchDetectionFilters): Promise<BatchDetailResponse> {
   const params = new URLSearchParams({ page: String(page), pageSize: '25' })
 
@@ -331,6 +355,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
   const [imagePreview, setImagePreview] = useState('')
   const [result, setResult] = useState<DetectionResultData | null>(null)
   const [detections, setDetections] = useState<RecentDetection[]>([])
+  const [reviewDetections, setReviewDetections] = useState<RecentDetection[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
@@ -371,6 +396,12 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando detecciones')
       })
 
+    loadPendingReviewDetections(camera.id)
+      .then(setReviewDetections)
+      .catch((loadError: unknown) => {
+        setError(loadError instanceof Error ? loadError.message : 'Error cargando revisiones pendientes')
+      })
+
     loadCameraStats(camera.id)
       .then((stats) => setCameraStats(stats))
       .catch((loadError: unknown) => {
@@ -402,13 +433,14 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
         setBatchSummary(data.summary ?? null)
         setBatchDetections(data.detections ?? [])
         setBatchTotalPages(data.pagination?.totalPages ?? 1)
-        if (data.job) {
-          setSelectedBatch(data.job)
-          setSelectedBatchId(data.job.id)
+        const detailedJob = mergeBatchProgress(data)
+        if (detailedJob) {
+          setSelectedBatch(detailedJob)
+          setSelectedBatchId(detailedJob.id)
           setBatchJobs((current) =>
-            current.some((job) => job.id === data.job?.id)
-              ? current.map((job) => (job.id === data.job?.id ? data.job : job))
-              : [data.job as BatchJob, ...current]
+            current.some((job) => job.id === detailedJob.id)
+              ? current.map((job) => (job.id === detailedJob.id ? detailedJob : job))
+              : [detailedJob, ...current]
           )
         }
       })
@@ -506,7 +538,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
             : `${detection.species} requiere validacion`,
         id: `review-${detection.id}`,
         time: formatNotificationDate(detection.createdAt, language),
-        title: 'Revision manual pendiente',
+        title: 'Revisión manual pendiente',
         tone: 'review' as const
       }))
     const batchItems = batchJobs.slice(0, 3).map((job) => ({
@@ -537,6 +569,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
     setDetections((currentDetections) =>
       currentDetections.map((detection) => (detection.id === updatedDetection.id ? normalizeDetection(updatedDetection) : detection))
     )
+    setReviewDetections((currentDetections) => currentDetections.filter((detection) => detection.id !== updatedDetection.id))
     setBatchDetections((currentDetections) =>
       currentDetections.map((detection) => (detection.id === updatedDetection.id ? normalizeDetection(updatedDetection) : detection))
     )
@@ -558,6 +591,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
 
       const nextData = await loadDetections(camera.id)
       setDetections(nextData.detections)
+      setReviewDetections(await loadPendingReviewDetections(camera.id))
     } catch (analysisError: unknown) {
       setError(analysisError instanceof Error ? analysisError.message : 'Error analizando la imagen')
     } finally {
@@ -592,13 +626,14 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
 
       const detail = await loadBatchDetail(job.id, 1, emptyBatchFilters)
 
-      if (detail.job) {
-        setSelectedBatchId(detail.job.id)
-        setSelectedBatch(detail.job)
+      const detailedJob = mergeBatchProgress(detail)
+      if (detailedJob) {
+        setSelectedBatchId(detailedJob.id)
+        setSelectedBatch(detailedJob)
         setBatchJobs((currentJobs) =>
-          currentJobs.some((currentJob) => currentJob.id === detail.job?.id)
-            ? currentJobs.map((currentJob) => (currentJob.id === detail.job?.id ? detail.job : currentJob))
-            : [detail.job as BatchJob, ...currentJobs]
+          currentJobs.some((currentJob) => currentJob.id === detailedJob.id)
+            ? currentJobs.map((currentJob) => (currentJob.id === detailedJob.id ? detailedJob : currentJob))
+            : [detailedJob, ...currentJobs]
         )
       }
       setBatchSummary(detail.summary ?? null)
@@ -627,13 +662,14 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
   }
 
   const handleBatchDetail = useCallback((data: BatchDetailResponse) => {
-    if (data.job) {
-      setSelectedBatchId(data.job.id)
-      setSelectedBatch(data.job)
+    const detailedJob = mergeBatchProgress(data)
+    if (detailedJob) {
+      setSelectedBatchId(detailedJob.id)
+      setSelectedBatch(detailedJob)
       setBatchJobs((currentJobs) =>
-        currentJobs.some((job) => job.id === data.job?.id)
-          ? currentJobs.map((job) => (job.id === data.job?.id ? data.job : job))
-          : [data.job as BatchJob, ...currentJobs]
+        currentJobs.some((job) => job.id === detailedJob.id)
+          ? currentJobs.map((job) => (job.id === detailedJob.id ? detailedJob : job))
+          : [detailedJob, ...currentJobs]
       )
     }
 
@@ -660,7 +696,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
           onLanguageChange={handleLanguageChange}
           text={text}
           title={camera.name}
-          subtitle={`${camera.code} Â· ${camera.zone}`}
+          subtitle={`${camera.code} · ${camera.zone}`}
         />
 
         <div className="contentArea cameraBatchWorkspace">
@@ -678,7 +714,7 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
             <SpeciesGallery camera={camera} detections={detections} language={language} onOpenDetection={setSelectedDetection} text={text} />
           ) : activeView === 'reviews' ? (
             <ManualReviewsPanel
-              detections={detections}
+              detections={reviewDetections}
               language={language}
               onReviewCompleted={handleManualReviewCompleted}
               text={text}
