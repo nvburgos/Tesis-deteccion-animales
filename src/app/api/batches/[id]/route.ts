@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
@@ -6,9 +8,72 @@ import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
 import { toProtectedDetectionImagePath } from '@/lib/fileStorage'
 import { formatRelativeDate } from '@/lib/detections'
-import { invalidSpeciesValues } from '@/lib/detectionClassification'
+import { calculateBatchProgress } from '@/lib/batchProgress'
+import { invalidSpeciesValues, isValidSpecies } from '@/lib/detectionClassification'
+import { getIdentificationLevel } from '@/lib/speciesTaxonomy'
 
 export const dynamic = 'force-dynamic'
+
+const manualReviewPriorityValues = ['Revision manual', 'Revisi?n manual', 'REVISION MANUAL', 'Manual review']
+const terminalReviewStatuses = ['Confirmada', 'Corregida', 'Sin fauna', 'No evaluable', 'Descartada']
+
+function appendWhereAnd(where: Prisma.DetectionWhereInput, condition: Prisma.DetectionWhereInput) {
+  where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), condition]
+}
+
+function pendingManualReviewCondition(): Prisma.DetectionWhereInput {
+  return {
+    OR: [
+      { manualReviewStatus: 'Pendiente' },
+      {
+        AND: [
+          { manualReviewStatus: null },
+          { manualReviewedAt: null },
+          {
+            OR: [
+              { priority: { in: manualReviewPriorityValues } },
+              { species: { in: invalidSpeciesValues } },
+              { confidence: { lte: 0 } }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+function reviewedManualReviewCondition(): Prisma.DetectionWhereInput {
+  return { OR: [{ manualReviewedAt: { not: null } }, { manualReviewStatus: { in: terminalReviewStatuses } }] }
+}
+
+function getStorageRoot() {
+  return path.resolve(process.env.STORAGE_ROOT || path.join(process.cwd(), 'storage'))
+}
+
+function getBatchRoot(batchId: number) {
+  const storageRoot = path.join(getStorageRoot(), 'uploads', 'batches', String(batchId))
+  const publicRoot = path.join(process.cwd(), 'public', 'uploads', 'batches', String(batchId))
+  return existsSync(storageRoot) || !existsSync(publicRoot) ? storageRoot : publicRoot
+}
+
+function readBatchProgressState(batchId: number) {
+  const statePath = path.join(getBatchRoot(batchId), '.progress.json')
+  if (!existsSync(statePath)) {
+    return null
+  }
+
+  try {
+    return JSON.parse(readFileSync(statePath, 'utf8')) as {
+      stage?: string
+      pythonStage?: string
+      updatedAt?: string
+      modelLoadSeconds?: number
+    }
+  } catch (error) {
+    console.error('No se pudo leer el estado de progreso del lote:', error)
+    return null
+  }
+}
 
 async function getCurrentUser() {
   const session = (await cookies()).get(AUTH_COOKIE)?.value
@@ -42,24 +107,13 @@ function normalizePriority(priority: string) {
     return 'Alta prioridad'
   }
 
-  if (priority === 'RevisiÃƒÆ’Ã‚Â³n manual') {
+  if (priority === 'Revision manual' || priority === 'Revisión manual') {
     return 'Revision manual'
   }
 
   return priority
 }
 
-function getBatchProgress(job: {
-  totalImages: number
-  processedImages: number
-  failedImages: number
-}) {
-  const completedUnits = job.processedImages + job.failedImages
-  const pendingImages = Math.max(0, job.totalImages - completedUnits)
-  const percentage = job.totalImages > 0 ? Math.min(100, Math.round((completedUnits / job.totalImages) * 100)) : null
-
-  return { pendingImages, percentage }
-}
 
 function toPublicDetection(detection: {
   id: number
@@ -152,7 +206,7 @@ function toPublicBatchJob(job: {
     zone: string
   } | null
 }) {
-  const progress = getBatchProgress(job)
+  const progress = calculateBatchProgress(job)
 
   return {
     completedAt: job.completedAt?.toISOString() ?? null,
@@ -244,9 +298,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   }
 
   if (review === 'reviewed') {
-    where.manualReviewedAt = { not: null }
+    appendWhereAnd(where, reviewedManualReviewCondition())
   } else if (review === 'pending') {
-    where.manualReviewedAt = null
+    appendWhereAnd(where, pendingManualReviewCondition())
   }
 
   if (detectionState === 'with') {
@@ -270,7 +324,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     OR: [{ species: { in: invalidSpeciesValues } }, { confidence: { lte: 0 } }]
   }
 
-  const [animalDetections, withoutDetection, speciesDistributionRows, totalFiltered, detections] = await Promise.all([
+  const [_positiveDetectionCount, _withoutDetectionCount, speciesDistributionRows, totalFiltered, detections] = await Promise.all([
     prisma.detection.count({ where: positiveWhere }),
     prisma.detection.count({ where: withoutWhere }),
     prisma.detection.groupBy({
@@ -326,8 +380,25 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     })
   ])
 
+  const speciesDistribution = speciesDistributionRows
+    .filter((item) => item.species && isValidSpecies(item.species))
+    .map((item) => ({
+      species: item.species as string,
+      count: item._count._all,
+      classificationLevel: getIdentificationLevel(item.species)
+    }))
+
+  const validAnimalDetections = speciesDistribution.reduce((sum, item) => sum + item.count, 0)
+  const validWithoutDetection = Math.max(0, job.processedImages - job.failedImages - validAnimalDetections)
+  const speciesDistributionWithPercentages = speciesDistribution.map((item) => ({
+    ...item,
+    percentage: validAnimalDetections > 0 ? Number(((item.count / validAnimalDetections) * 100).toFixed(1)) : 0
+  }))
+
   const durationMs = job.completedAt ? job.completedAt.getTime() - job.createdAt.getTime() : null
-  const progress = getBatchProgress(job)
+  const progress = calculateBatchProgress(job)
+  const progressState = readBatchProgressState(job.id)
+  const stage = job.status === 'Procesando' && progressState?.stage ? progressState.stage : progress.stage
 
   return NextResponse.json({
     job: toPublicBatchJob(job),
@@ -335,6 +406,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       id: job.id,
       zipName: job.zipName,
       status: job.status,
+      stage,
+      stageUpdatedAt: progressState?.updatedAt ?? null,
+      pythonStage: progressState?.pythonStage ?? null,
       startedAt: job.startedAt?.toISOString() ?? null,
       heartbeatAt: job.heartbeatAt?.toISOString() ?? null,
       attempts: job.attempts ?? 0,
@@ -343,9 +417,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       totalImages: job.totalImages,
       processedImages: job.processedImages,
       failedImages: job.failedImages,
+      completedImages: progress.completedImages,
       pendingImages: progress.pendingImages,
       percentage: progress.percentage,
-      detectionsFound: animalDetections,
+      detectionsFound: validAnimalDetections,
+      withoutDetection: validWithoutDetection,
+      elapsedSeconds: progress.elapsedSeconds,
+      queueSeconds: progress.queueSeconds,
+      imagesPerMinute: progress.imagesPerMinute,
+      averageSecondsPerImage: progress.averageSecondsPerImage,
+      estimatedRemainingSeconds: progress.estimatedRemainingSeconds,
       createdAt: job.createdAt.toISOString(),
       completedAt: job.completedAt?.toISOString() ?? null
     },
@@ -361,17 +442,26 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       totalImages: job.totalImages,
       processedImages: job.processedImages,
       failedImages: job.failedImages,
+      completedImages: progress.completedImages,
       pendingImages: progress.pendingImages,
       percentage: progress.percentage,
-      detectionsFound: animalDetections,
-      animalDetections,
-      withoutDetection,
-      distinctSpecies: speciesDistributionRows.length,
+      stage,
+      stageUpdatedAt: progressState?.updatedAt ?? null,
+      pythonStage: progressState?.pythonStage ?? null,
+      detectionsFound: validAnimalDetections,
+      animalDetections: validAnimalDetections,
+      withoutDetection: validWithoutDetection,
+      elapsedSeconds: progress.elapsedSeconds,
+      queueSeconds: progress.queueSeconds,
+      imagesPerMinute: progress.imagesPerMinute,
+      averageSecondsPerImage: progress.averageSecondsPerImage,
+      estimatedRemainingSeconds: progress.estimatedRemainingSeconds,
+      distinctSpecies: speciesDistributionWithPercentages.length,
       createdAt: job.createdAt.toISOString(),
       completedAt: job.completedAt?.toISOString() ?? null,
       durationMs,
       camera: job.camera,
-      speciesDistribution: speciesDistributionRows.map((item) => ({ species: item.species, count: item._count._all }))
+      speciesDistribution: speciesDistributionWithPercentages
     },
     detections: detections.map(toPublicDetection),
     pagination: {

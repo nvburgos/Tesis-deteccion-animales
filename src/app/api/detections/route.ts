@@ -88,6 +88,44 @@ function toPublicDetection(detection: PublicDetectionInput) {
   }
 }
 
+const manualReviewPriorityValues = ['Revision manual', 'Revisi?n manual', 'REVISION MANUAL', 'Manual review']
+const terminalReviewStatuses = ['Confirmada', 'Corregida', 'Sin fauna', 'No evaluable', 'Descartada']
+
+function withPendingManualReview(where: Prisma.DetectionWhereInput): Prisma.DetectionWhereInput {
+  return {
+    AND: [
+      where,
+      {
+        OR: [
+          { manualReviewStatus: 'Pendiente' },
+          {
+            AND: [
+              { manualReviewStatus: null },
+              { manualReviewedAt: null },
+              {
+                OR: [
+                  { priority: { in: manualReviewPriorityValues } },
+                  { species: { in: invalidSpeciesValues } },
+                  { confidence: { lte: 0 } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+function withReviewedManualReview(where: Prisma.DetectionWhereInput): Prisma.DetectionWhereInput {
+  return {
+    AND: [
+      where,
+      { OR: [{ manualReviewedAt: { not: null } }, { manualReviewStatus: { in: terminalReviewStatuses } }] }
+    ]
+  }
+}
+
 const reviewerSelect = {
   select: {
     email: true,
@@ -159,6 +197,9 @@ export async function GET(request: NextRequest) {
   const researcherFilter = Number(searchParams.get('researcherId') ?? '')
   const cameraFilter = Number(searchParams.get('cameraId') ?? '')
   const batchJobFilter = Number(searchParams.get('batchJobId') ?? '')
+  const minConfidenceFilter = Number(searchParams.get('minConfidence') ?? '')
+  const priorityFilter = searchParams.get('priority')?.trim()
+  const reviewFilter = searchParams.get('review')?.trim() ?? searchParams.get('reviewStatus')?.trim() ?? ''
   const legacyLimit = Number(searchParams.get('limit') ?? '')
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
   const requestedPageSize = Number(searchParams.get('pageSize') ?? '') || (Number.isFinite(legacyLimit) && legacyLimit > 0 ? legacyLimit : 20)
@@ -182,12 +223,27 @@ export async function GET(request: NextRequest) {
     where.species = speciesFilter
   }
 
+  if (Number.isFinite(minConfidenceFilter) && minConfidenceFilter > 0) {
+    where.confidence = { gte: minConfidenceFilter }
+  }
+
+  if (priorityFilter) {
+    where.priority = priorityFilter
+  }
+
   if (dateFilter) {
     const start = new Date(`${dateFilter}T00:00:00`)
     const end = new Date(start)
     end.setDate(end.getDate() + 1)
     where.createdAt = { gte: start, lt: end }
   }
+
+  const filteredWhere =
+    reviewFilter === 'pending'
+      ? withPendingManualReview(where)
+      : reviewFilter === 'reviewed'
+        ? withReviewedManualReview(where)
+        : where
 
   const speciesOptionsWhere: Prisma.DetectionWhereInput = isAdmin ? {} : { userId: currentUser.id }
 
@@ -205,9 +261,9 @@ export async function GET(request: NextRequest) {
 
   const detectionSelect = getDetectionSelect(hasCaptureColumns)
   const [totalFiltered, detections, availableSpeciesRows] = await Promise.all([
-    prisma.detection.count({ where }),
+    prisma.detection.count({ where: filteredWhere }),
     prisma.detection.findMany({
-      where,
+      where: filteredWhere,
       orderBy: { createdAt: 'desc' },
       select: detectionSelect,
       skip: (page - 1) * pageSize,
@@ -221,10 +277,13 @@ export async function GET(request: NextRequest) {
   ])
 
   const positiveWhere: Prisma.DetectionWhereInput = {
-    ...where,
+    ...filteredWhere,
     species: { notIn: invalidSpeciesValues },
     confidence: { gt: 0 }
   }
+
+  const pendingWhere = withPendingManualReview(where)
+  const pendingReviews = await prisma.detection.count({ where: pendingWhere })
 
   const total = totalFiltered
   const totalDetections = await prisma.detection.count({ where: positiveWhere })
@@ -259,12 +318,16 @@ export async function GET(request: NextRequest) {
       }
     ],
     detections: detections.map(toPublicDetection),
+    items: detections.map(toPublicDetection),
     availableSpecies: availableSpeciesRows.map((item) => item.species).filter(Boolean),
     pagination: {
       page,
       pageSize,
       total: totalFiltered,
       totalPages: Math.max(1, Math.ceil(totalFiltered / pageSize))
+    },
+    summary: {
+      pending: pendingReviews
     }
   })
 }
@@ -323,10 +386,6 @@ export async function PATCH(request: NextRequest) {
 
   if (!isAdminRole(currentUser.role) && detection.userId !== currentUser.id) {
     return NextResponse.json({ error: 'No autorizado para revisar esta deteccion' }, { status: 403 })
-  }
-
-  if (detection.priority !== 'Revision manual') {
-    return NextResponse.json({ error: 'Esta deteccion no requiere revision manual' }, { status: 400 })
   }
 
   if (!reviewedSpecies) {

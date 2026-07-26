@@ -1053,6 +1053,7 @@ Variables operativas del worker:
 | `MAX_BATCH_ATTEMPTS` | Intentos maximos antes de marcar un lote como `Fallido`. | `3` |
 | `WORKER_HEARTBEAT_SECONDS` | Frecuencia de actualizacion de `heartbeatAt`. | `10` |
 | `WORKER_ID` | Identificador fijo opcional del worker. Si no existe, se genera automaticamente. | vacio |
+| `PROGRESS_MICROBATCH_SIZE` | Cantidad de imagenes por microbatch de progreso. `1` emite y guarda avance por imagen. | `1` |
 
 Campos operativos agregados a `BatchJob`:
 
@@ -1381,6 +1382,7 @@ WildlifeAI se ejecuta como cinco piezas coordinadas:
 | `SPECIESNET_COUNTRY` | Geofence de SpeciesNet. Para Ecuador: `ECU`. |
 | `SPECIESNET_TIMEOUT` | Timeout del analisis individual. |
 | `SPECIESNET_BATCH_SIZE` | Tamano de lote interno para inferencia batch. |
+| `PROGRESS_MICROBATCH_SIZE` | Cantidad de imagenes por microbatch antes de emitir resultados al worker. |
 | `SPECIESNET_BATCH_TIMEOUT_MS` | Timeout operativo del procesamiento batch. |
 | `MEGADETECTOR_ENABLED` | Activa respaldo MegaDetector standalone. |
 | `MEGADETECTOR_MODEL` | Modelo MegaDetector de respaldo. |

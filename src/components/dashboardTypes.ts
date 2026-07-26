@@ -77,6 +77,22 @@ export type BatchJob = {
   completedAt: string | null
   createdAt: string
   error?: string | null
+  attempts?: number
+  averageSecondsPerImage?: number | null
+  completedImages?: number
+  elapsedSeconds?: number | null
+  estimatedRemainingSeconds?: number | null
+  heartbeatAt?: string | null
+  imagesPerMinute?: number | null
+  lastError?: string | null
+  nextRetryAt?: string | null
+  queueSeconds?: number | null
+  stage?: string
+  stageUpdatedAt?: string | null
+  pythonStage?: string | null
+  startedAt?: string | null
+  withoutDetection?: number
+  workerId?: string | null
   detectionsFound?: number
   failedImages: number
   pendingImages?: number

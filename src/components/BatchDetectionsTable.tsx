@@ -3,7 +3,8 @@
 import { Eye, SlidersHorizontal, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { getSpeciesLabel } from '@/lib/i18n'
-import type { Language, Priority, RecentDetection } from './dashboardTypes'
+import { isPendingManualReview, normalizePriority, normalizeReviewStatus } from '@/lib/manualReviewPolicy'
+import type { Language, RecentDetection } from './dashboardTypes'
 
 export type BatchDetectionFilters = {
   species: string
@@ -17,15 +18,18 @@ function getFilename(path: string) {
   return decodeURIComponent(path.split('/').pop() ?? path)
 }
 
-function PriorityBadge({ priority }: { priority: Priority }) {
+function ReviewPriorityBadge({ detection }: { detection: RecentDetection }) {
+  const reviewStatus = normalizeReviewStatus(detection.manualReviewStatus)
+  const isPending = isPendingManualReview(detection)
+  const label = reviewStatus && !isPending ? reviewStatus : isPending ? 'Revision manual' : normalizePriority(detection.priority)
   const className =
-    priority === 'Alta prioridad'
-      ? 'priorityPill priorityHigh'
-      : priority === 'Revision manual'
-        ? 'priorityPill priorityReview'
+    isPending
+      ? 'priorityPill priorityReview'
+      : label === 'Alta prioridad'
+        ? 'priorityPill priorityHigh'
         : 'priorityPill priorityNormal'
 
-  return <span className={className}>{priority}</span>
+  return <span className={className}>{label}</span>
 }
 
 export default function BatchDetectionsTable({
@@ -143,7 +147,7 @@ export default function BatchDetectionsTable({
                   </td>
                   <td className="speciesCell">{getSpeciesLabel(detection.species, language)}</td>
                   <td className="confidenceCell"><span>{Math.round(detection.confidence)}%</span></td>
-                  <td><PriorityBadge priority={detection.priority} /></td>
+                  <td><ReviewPriorityBadge detection={detection} /></td>
                   <td>{new Date(detection.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</td>
                   <td>
                     <button className="ghostTableAction" onClick={() => onOpenDetection(detection)} type="button">

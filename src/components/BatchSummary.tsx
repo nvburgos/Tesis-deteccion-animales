@@ -6,6 +6,8 @@ import type { BatchJob, Camera } from './dashboardTypes'
 export type SpeciesDistributionItem = {
   species: string
   count: number
+  percentage?: number
+  classificationLevel?: 'species' | 'family' | 'genus' | 'general' | 'taxonomic_group' | 'unclassified'
 }
 
 export type BatchSummaryData = {
