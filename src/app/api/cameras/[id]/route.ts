@@ -13,6 +13,8 @@ type CameraWithDetections = {
   name: string
   zone: string
   description: string | null
+  latitude: number | null
+  longitude: number | null
   active: boolean
   createdAt: Date
   updatedAt: Date
@@ -46,14 +48,32 @@ async function getCameraId(context: { params: Promise<{ id: string }> }) {
 }
 
 function cleanCameraPayload(body: unknown) {
-  const payload = body as Partial<Record<'name' | 'code' | 'zone' | 'description', unknown>> | null
+  const payload = body as Partial<Record<'name' | 'code' | 'zone' | 'description' | 'latitude' | 'longitude', unknown>> | null
+  const latitude = typeof payload?.latitude === 'number' ? payload.latitude : Number(payload?.latitude ?? '')
+  const longitude = typeof payload?.longitude === 'number' ? payload.longitude : Number(payload?.longitude ?? '')
 
   return {
     name: typeof payload?.name === 'string' ? payload.name.trim() : '',
     code: typeof payload?.code === 'string' ? payload.code.trim() : '',
     zone: typeof payload?.zone === 'string' ? payload.zone.trim() : '',
-    description: typeof payload?.description === 'string' ? payload.description.trim() : ''
+    description: typeof payload?.description === 'string' ? payload.description.trim() : '',
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null
   }
+}
+
+function hasInvalidCoordinates(payload: ReturnType<typeof cleanCameraPayload>) {
+  const hasLatitude = payload.latitude !== null
+  const hasLongitude = payload.longitude !== null
+
+  if (hasLatitude !== hasLongitude) {
+    return true
+  }
+
+  return (
+    (payload.latitude !== null && (payload.latitude < -90 || payload.latitude > 90)) ||
+    (payload.longitude !== null && (payload.longitude < -180 || payload.longitude > 180))
+  )
 }
 
 function toCameraDetail(camera: CameraWithDetections) {
@@ -72,6 +92,8 @@ function toCameraDetail(camera: CameraWithDetections) {
     name: camera.name,
     zone: camera.zone,
     description: camera.description,
+    latitude: camera.latitude,
+    longitude: camera.longitude,
     active: camera.active,
     createdAt: camera.createdAt.toISOString(),
     updatedAt: camera.updatedAt.toISOString(),
@@ -145,6 +167,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Nombre, codigo y zona son obligatorios' }, { status: 400 })
     }
 
+    if (hasInvalidCoordinates(payload)) {
+      return NextResponse.json({ error: 'Coordenadas invalidas' }, { status: 400 })
+    }
+
     const camera = await prisma.camera.findFirst({
       where: { id: cameraId, active: true },
       select: { id: true, code: true }
@@ -170,7 +196,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         code: payload.code,
         name: payload.name,
         zone: payload.zone,
-        description: payload.description || null
+        description: payload.description || null,
+        latitude: payload.latitude,
+        longitude: payload.longitude
       },
       include: {
         detections: {

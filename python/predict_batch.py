@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from capture_datetime import extract_capture_datetime
+from capture_datetime import extract_capture_metadata
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 MEGADETECTOR_LABELS = {
@@ -69,7 +69,9 @@ def speciesnet_class_to_display_name(label):
 
 
 def prediction_to_result(image_path, prediction):
-    captured_at, capture_date_source = extract_capture_datetime(image_path)
+    metadata = extract_capture_metadata(image_path)
+    captured_at = metadata.get("capturedAt")
+    capture_date_source = metadata.get("captureDateSource")
     detections = prediction.get("detections", [])
     animal_detections = [
         detection for detection in detections if str(detection.get("category")) == "1"
@@ -93,6 +95,10 @@ def prediction_to_result(image_path, prediction):
             "coordinates": None,
             "capturedAt": captured_at,
             "captureDateSource": capture_date_source,
+            "cameraTrapCode": metadata.get("cameraTrapCode"),
+            "temperatureCelsius": metadata.get("temperatureCelsius"),
+            "temperatureFahrenheit": metadata.get("temperatureFahrenheit"),
+            "visibleMetadataText": metadata.get("visibleMetadataText"),
             "animalDetected": False,
             "detector": "SpeciesNet",
             "model": prediction.get("model_version"),
@@ -106,6 +112,10 @@ def prediction_to_result(image_path, prediction):
             "coordinates": coordinates,
             "capturedAt": captured_at,
             "captureDateSource": capture_date_source,
+            "cameraTrapCode": metadata.get("cameraTrapCode"),
+            "temperatureCelsius": metadata.get("temperatureCelsius"),
+            "temperatureFahrenheit": metadata.get("temperatureFahrenheit"),
+            "visibleMetadataText": metadata.get("visibleMetadataText"),
             "animalDetected": True,
             "animalConfidence": animal_confidence,
             "detector": "SpeciesNet",
@@ -120,6 +130,10 @@ def prediction_to_result(image_path, prediction):
         "coordinates": coordinates,
         "capturedAt": captured_at,
         "captureDateSource": capture_date_source,
+        "cameraTrapCode": metadata.get("cameraTrapCode"),
+        "temperatureCelsius": metadata.get("temperatureCelsius"),
+        "temperatureFahrenheit": metadata.get("temperatureFahrenheit"),
+        "visibleMetadataText": metadata.get("visibleMetadataText"),
         "animalDetected": True,
         "animalConfidence": animal_confidence,
         "detector": "SpeciesNet",
@@ -155,7 +169,7 @@ def load_predictions_json(path):
 
 
 def emit_missing_prediction(image_path, index, total):
-    captured_at, capture_date_source = extract_capture_datetime(image_path)
+    metadata = extract_capture_metadata(image_path)
     emit({
         "type": "result",
         "index": index,
@@ -164,8 +178,12 @@ def emit_missing_prediction(image_path, index, total):
         "species": "Sin deteccion",
         "confidence": 0,
         "coordinates": None,
-        "capturedAt": captured_at,
-        "captureDateSource": capture_date_source,
+        "capturedAt": metadata.get("capturedAt"),
+        "captureDateSource": metadata.get("captureDateSource"),
+        "cameraTrapCode": metadata.get("cameraTrapCode"),
+        "temperatureCelsius": metadata.get("temperatureCelsius"),
+        "temperatureFahrenheit": metadata.get("temperatureFahrenheit"),
+        "visibleMetadataText": metadata.get("visibleMetadataText"),
         "error": "SpeciesNet did not return a prediction for this image",
     })
 

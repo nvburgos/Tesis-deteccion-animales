@@ -12,6 +12,8 @@ function toCameraSummary(camera: {
   name: string
   zone: string
   description: string | null
+  latitude: number | null
+  longitude: number | null
   active: boolean
   createdAt: Date
   updatedAt: Date
@@ -35,6 +37,8 @@ function toCameraSummary(camera: {
     name: camera.name,
     zone: camera.zone,
     description: camera.description,
+    latitude: camera.latitude,
+    longitude: camera.longitude,
     active: camera.active,
     createdAt: camera.createdAt.toISOString(),
     updatedAt: camera.updatedAt.toISOString(),

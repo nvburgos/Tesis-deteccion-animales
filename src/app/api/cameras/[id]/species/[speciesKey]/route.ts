@@ -49,6 +49,10 @@ function toPublicDetection(detection: {
   priority: string
   cameraId: number | null
   batchJobId: number | null
+  individualId?: number | null
+  individualMatchStatus?: string | null
+  individualMatchConfidence?: number | null
+  individualMatchBasis?: string | null
   x1: number | null
   y1: number | null
   x2: number | null
@@ -63,8 +67,13 @@ function toPublicDetection(detection: {
   createdAt: Date
   capturedAt?: Date | null
   captureDateSource?: string | null
+  cameraTrapCode?: string | null
+  temperatureCelsius?: number | null
+  temperatureFahrenheit?: number | null
+  visibleMetadataText?: string | null
   userId: number | null
   camera?: { id: number; code: string; name: string; zone: string } | null
+  individual?: { id: number; species: string; label: string | null } | null
   reviewedBy?: { id: number; name: string; email: string } | null
 }) {
   return {
@@ -77,6 +86,11 @@ function toPublicDetection(detection: {
     cameraId: detection.cameraId,
     batchJobId: detection.batchJobId,
     camera: detection.camera ?? null,
+    individualId: detection.individualId ?? null,
+    individualMatchStatus: detection.individualMatchStatus ?? null,
+    individualMatchConfidence: detection.individualMatchConfidence ?? null,
+    individualMatchBasis: detection.individualMatchBasis ?? null,
+    individual: detection.individual ?? null,
     x1: detection.x1,
     y1: detection.y1,
     x2: detection.x2,
@@ -93,6 +107,10 @@ function toPublicDetection(detection: {
     createdAt: detection.createdAt.toISOString(),
     capturedAt: detection.capturedAt?.toISOString() ?? null,
     captureDateSource: detection.captureDateSource ?? null,
+    cameraTrapCode: detection.cameraTrapCode ?? null,
+    temperatureCelsius: detection.temperatureCelsius ?? null,
+    temperatureFahrenheit: detection.temperatureFahrenheit ?? null,
+    visibleMetadataText: detection.visibleMetadataText ?? null,
     time: formatRelativeDate(detection.createdAt)
   }
 }
@@ -171,6 +189,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           priority: true,
           cameraId: true,
           batchJobId: true,
+          individualId: true,
+          individualMatchStatus: true,
+          individualMatchConfidence: true,
+          individualMatchBasis: true,
           x1: true,
           y1: true,
           x2: true,
@@ -179,8 +201,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           manualReviewNote: true,
           createdAt: true,
           userId: true,
+          cameraTrapCode: true,
+          temperatureCelsius: true,
+          temperatureFahrenheit: true,
+          visibleMetadataText: true,
           ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
           camera: { select: { code: true, id: true, name: true, zone: true } },
+          individual: { select: { id: true, label: true, species: true } },
           reviewedBy: { select: { email: true, id: true, name: true } }
         },
         skip: (page - 1) * pageSize,

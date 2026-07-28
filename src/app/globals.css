@@ -2720,6 +2720,181 @@ tbody tr:hover {
   box-shadow: 0 0 0 3px rgba(143, 180, 159, 0.25);
 }
 
+.cameraLocationPicker {
+  border: 1px solid #dfe7e2;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.cameraLocationHeader {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.cameraLocationHeader > span {
+  color: #29312e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cameraLocationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.compactButton {
+  font-size: 12px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.compactIconButton {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.cameraMapPicker {
+  background: #dce9e6;
+  border: 1px solid #c9d8d2;
+  border-radius: 12px;
+  cursor: crosshair;
+  display: block;
+  height: 260px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  width: 100%;
+}
+
+.cameraMapPicker:active {
+  cursor: grabbing;
+}
+
+.cameraMapFallback {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.28) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.28) 1px, transparent 1px),
+    linear-gradient(135deg, #c8dccf 0%, #d9e8e4 45%, #b8d1da 100%);
+  background-size: 42px 42px, 42px 42px, 100% 100%;
+  inset: 0;
+  position: absolute;
+  z-index: 0;
+}
+
+.cameraMapFallback::before {
+  background: #8dbb91;
+  border: 1px solid rgba(51, 93, 65, 0.45);
+  border-radius: 46% 54% 48% 52% / 36% 44% 56% 64%;
+  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0.12);
+  content: '';
+  height: 122px;
+  left: 48%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  width: 86px;
+}
+
+.cameraMapFallback::after {
+  background: #7fb08a;
+  border: 1px solid rgba(51, 93, 65, 0.38);
+  border-radius: 999px;
+  content: '';
+  height: 16px;
+  left: 20%;
+  position: absolute;
+  top: 62%;
+  width: 52px;
+}
+
+.fallbackMapLabel,
+.fallbackMapIsland,
+.fallbackMapNorth {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(23, 35, 29, 0.12);
+  border-radius: 999px;
+  color: #25332b;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 8px;
+  position: absolute;
+  z-index: 1;
+}
+
+.fallbackMapLabel {
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+}
+
+.fallbackMapIsland {
+  bottom: 32px;
+  left: 12%;
+}
+
+.fallbackMapNorth {
+  right: 18px;
+  top: 18px;
+}
+
+.cameraMapPicker:focus {
+  box-shadow: 0 0 0 3px rgba(143, 180, 159, 0.35);
+  outline: 0;
+}
+
+.cameraMapTiles {
+  left: 50%;
+  max-width: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.cameraMapTile {
+  -webkit-user-drag: none;
+  height: 256px;
+  object-fit: cover;
+  pointer-events: none;
+  position: absolute;
+  user-select: none;
+  width: 256px;
+  z-index: 1;
+}
+
+.cameraMapMarker {
+  color: #d63c2f;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.3));
+  height: 26px;
+  position: absolute;
+  transform: translate(-50%, -96%);
+  width: 26px;
+  z-index: 3;
+}
+
+.coordinateGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mapHint {
+  color: #5d6963;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .modalActions {
   align-items: center;
   display: flex;
@@ -2745,6 +2920,24 @@ tbody tr:hover {
   .modalActions {
     align-items: stretch;
     flex-direction: column-reverse;
+  }
+
+  .cameraLocationHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cameraLocationActions {
+    justify-content: stretch;
+  }
+
+  .cameraLocationActions .secondaryButton {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .coordinateGrid {
+    grid-template-columns: 1fr;
   }
 }
 

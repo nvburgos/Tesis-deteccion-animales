@@ -123,6 +123,15 @@ function normalizeResult(result: BackendAnalyzeResponse, language: Language): De
     imagePath: result.imagePath,
     location: result.location,
     createdAt: result.createdAt,
+    cameraTrapCode: result.cameraTrapCode,
+    temperatureCelsius: result.temperatureCelsius,
+    temperatureFahrenheit: result.temperatureFahrenheit,
+    visibleMetadataText: result.visibleMetadataText,
+    individualId: result.individualId,
+    individualMatchStatus: result.individualMatchStatus,
+    individualMatchConfidence: result.individualMatchConfidence,
+    individualMatchBasis: result.individualMatchBasis,
+    individual: result.individual,
     coordinates: result.coordinates ?? null
   }
 }

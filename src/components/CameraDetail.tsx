@@ -167,6 +167,15 @@ function normalizeResult(result: BackendAnalyzeResponse, language: Language): De
     cameraId: result.cameraId,
     batchJobId: result.batchJobId,
     camera: result.camera,
+    cameraTrapCode: result.cameraTrapCode,
+    temperatureCelsius: result.temperatureCelsius,
+    temperatureFahrenheit: result.temperatureFahrenheit,
+    visibleMetadataText: result.visibleMetadataText,
+    individualId: result.individualId,
+    individualMatchStatus: result.individualMatchStatus,
+    individualMatchConfidence: result.individualMatchConfidence,
+    individualMatchBasis: result.individualMatchBasis,
+    individual: result.individual,
     coordinates: result.coordinates ?? null
   }
 }
@@ -696,7 +705,11 @@ export default function CameraDetail({ camera }: { camera: CameraSummary }) {
           onLanguageChange={handleLanguageChange}
           text={text}
           title={camera.name}
-          subtitle={`${camera.code} · ${camera.zone}`}
+          subtitle={`${camera.code} · ${camera.zone}${
+            camera.latitude !== null && camera.latitude !== undefined && camera.longitude !== null && camera.longitude !== undefined
+              ? ` · ${camera.latitude.toFixed(5)}, ${camera.longitude.toFixed(5)}`
+              : ''
+          }`}
         />
 
         <div className="contentArea cameraBatchWorkspace">

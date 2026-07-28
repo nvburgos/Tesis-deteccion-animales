@@ -32,6 +32,34 @@ function formatCaptureSource(value?: string | null) {
   return 'UNKNOWN'
 }
 
+function formatTemperature(celsius?: number | null, fahrenheit?: number | null) {
+  if (typeof celsius === 'number' && typeof fahrenheit === 'number') {
+    return `${Math.round(celsius)} °C / ${Math.round(fahrenheit)} °F`
+  }
+
+  if (typeof celsius === 'number') {
+    return `${Math.round(celsius)} °C`
+  }
+
+  if (typeof fahrenheit === 'number') {
+    return `${Math.round(fahrenheit)} °F`
+  }
+
+  return 'No disponible'
+}
+
+function getIndividualLabel(detection: RecentDetection) {
+  return detection.individual?.label ?? (detection.individualId ? `Individuo #${detection.individualId}` : 'Sin asignar')
+}
+
+function formatMatchConfidence(value?: number | null) {
+  if (typeof value !== 'number') {
+    return null
+  }
+
+  return `${Math.round(value)}%`
+}
+
 export default function DetectionDetailModal({
   batch,
   camera,
@@ -208,8 +236,20 @@ export default function DetectionDetailModal({
             <div><span>Lote</span><strong>{batch?.zipName ?? 'Sin lote asociado'}</strong></div>
             <div><span>Fecha de captura</span><strong>{detection.capturedAt ? formatDateTime(detection.capturedAt) : 'Fecha de captura no disponible'}</strong></div>
             <div><span>Fuente</span><strong>{formatCaptureSource(detection.captureDateSource)}</strong></div>
+            <div><span>Codigo visible camara</span><strong>{detection.cameraTrapCode ?? 'No disponible'}</strong></div>
+            <div><span>Temperatura</span><strong>{formatTemperature(detection.temperatureCelsius, detection.temperatureFahrenheit)}</strong></div>
             <div><span>Fecha de procesamiento</span><strong>{formatDateTime(detection.createdAt)}</strong></div>
+            <div>
+              <span>Reencuentro</span>
+              <strong>{getIndividualLabel(detection)}</strong>
+              <small>
+                {detection.individualMatchStatus ?? 'Sin analisis'}
+                {formatMatchConfidence(detection.individualMatchConfidence) ? ` · ${formatMatchConfidence(detection.individualMatchConfidence)}` : ''}
+              </small>
+              {detection.individualMatchBasis ? <small>{detection.individualMatchBasis}</small> : null}
+            </div>
             <div><span>Archivo original</span><strong>{getFilename(detection.imagePath)}</strong></div>
+            <div><span>Texto OCR</span><strong>{detection.visibleMetadataText ?? 'No disponible'}</strong></div>
             <div><span>Observaciones</span><strong>{detection.manualReviewNote ?? 'Sin observaciones'}</strong></div>
             <div><span>Revision manual</span><strong>{detection.manualReviewedAt ? 'Revisada' : 'Pendiente'}</strong></div>
             <div><span>Deteccion</span><strong><ScanLine size={16} /> {box ? 'Cuadro disponible' : 'Sin coordenadas'}</strong></div>

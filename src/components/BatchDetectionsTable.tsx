@@ -32,6 +32,22 @@ function ReviewPriorityBadge({ detection }: { detection: RecentDetection }) {
   return <span className={className}>{label}</span>
 }
 
+function getIndividualLabel(detection: RecentDetection) {
+  return detection.individual?.label ?? (detection.individualId ? `Individuo #${detection.individualId}` : 'Sin asignar')
+}
+
+function getMatchDetail(detection: RecentDetection) {
+  if (!detection.individualMatchStatus) {
+    return null
+  }
+
+  if (typeof detection.individualMatchConfidence === 'number') {
+    return `${detection.individualMatchStatus} · ${Math.round(detection.individualMatchConfidence)}%`
+  }
+
+  return detection.individualMatchStatus
+}
+
 export default function BatchDetectionsTable({
   detections,
   filters,
@@ -132,6 +148,7 @@ export default function BatchDetectionsTable({
             <tr>
               <th>Miniatura</th>
               <th>Especie</th>
+              <th>Individuo</th>
               <th>Confianza</th>
               <th>Prioridad</th>
               <th>Fecha</th>
@@ -146,6 +163,10 @@ export default function BatchDetectionsTable({
                     {detection.imagePath ? <img alt={getFilename(detection.imagePath)} className="wildlifeImage compactThumb" src={detection.imagePath} /> : <span className="wildlifeThumb compactThumb" />}
                   </td>
                   <td className="speciesCell">{getSpeciesLabel(detection.species, language)}</td>
+                  <td>
+                    <strong>{getIndividualLabel(detection)}</strong>
+                    {getMatchDetail(detection) ? <span className="tableSubtext">{getMatchDetail(detection)}</span> : null}
+                  </td>
                   <td className="confidenceCell"><span>{Math.round(detection.confidence)}%</span></td>
                   <td><ReviewPriorityBadge detection={detection} /></td>
                   <td>{new Date(detection.createdAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</td>
@@ -159,7 +180,7 @@ export default function BatchDetectionsTable({
               ))
             ) : (
               <tr>
-                <td className="emptyState" colSpan={6}>No hay resultados para los filtros seleccionados.</td>
+                <td className="emptyState" colSpan={7}>No hay resultados para los filtros seleccionados.</td>
               </tr>
             )}
           </tbody>

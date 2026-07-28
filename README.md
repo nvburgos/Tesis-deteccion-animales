@@ -259,9 +259,10 @@ model Detection {
 | `python/predict.py` | Orquesta el flujo de IA. Primero intenta SpeciesNet, que integra detector, clasificador y ensemble. Si SpeciesNet no puede ejecutarse o se deshabilita, usa MegaDetector standalone para detectar animales y YOLO para clasificar la especie. Si el MegaDetector standalone se deshabilita, ejecuta YOLO directo. |
 | `python/train.py` | Entrena un modelo YOLO usando `python/dataset/data.yaml` y copia el mejor peso a `python/best.pt`. |
 | `python/prepare_dataset.py` | Valida datasets YOLO en `python/datasets_raw`, remapea clases objetivo y genera `python/dataset/data.yaml` solo si hay imagenes y labels validos. |
+| `scripts/generate-ecuador-species-catalog.py` | Extrae nombres cientificos desde los PDF de mamiferos, aves y reptiles entregados para generar el catalogo local de especies. |
 | `python/update_labels.py` | Script auxiliar para incrementar IDs de clases en archivos `.txt` de labels. Usar con cuidado. |
 | `python/wildlife_classes.yaml` | Catalogo inicial de especies objetivo: jaguar, tapir_amazonico, venado_cola_blanca, ocelote y puma. |
-| `python/requirements.txt` | Dependencias Python necesarias: `speciesnet`, `megadetector` y `ultralytics`. |
+| `python/requirements.txt` | Dependencias Python necesarias: `speciesnet`, `megadetector`, `ultralytics` y utilidades como `pypdf`. |
 | `python/datasets_raw/` | Carpeta donde se colocan datasets fuente exportados en formato YOLO. |
 
 ### Carpeta Public
@@ -621,6 +622,22 @@ UI en ingles: Leopard
 ## Entrenamiento YOLO
 
 El modelo actual `python/best.pt` se conserva y por ahora solo detecta `leopard`. Todavia falta recibir imagenes reales del Proyecto Sacha para entrenar las especies objetivo de WildlifeAI.
+
+## Catalogo ecuatoriano de especies
+
+El proyecto incluye `src/lib/ecuadorSpeciesCatalog.ts`, generado desde los PDF entregados el 2026-07-27:
+
+- `Mamiferos del Ecuador: lista oficial actualizada de especies`, version 2023.2.
+- `Lista Roja de las Aves del Ecuador`, 2019.
+- `Lista Roja de los Reptiles del Ecuador`, 2005.
+
+Este catalogo alimenta las sugerencias de revision manual y permite clasificar nombres cientificos por grupo taxonomico. No significa que el modelo detecte automaticamente todas esas especies: para eso se necesitan imagenes reales anotadas y entrenamiento/validacion del modelo. La extraccion de reptiles proviene de un PDF con OCR antiguo, por lo que debe revisarse antes de usarla como fuente de entrenamiento.
+
+Para regenerar el catalogo desde los PDF:
+
+```bash
+python scripts/generate-ecuador-species-catalog.py --mammals-pdf "C:\ruta\mamiferos.pdf" --birds-pdf "C:\ruta\aves.pdf" --reptiles-pdf "C:\ruta\reptiles.pdf"
+```
 
 Especies objetivo iniciales:
 

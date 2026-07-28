@@ -7,6 +7,7 @@ from functools import lru_cache
 
 from PIL import Image
 
+from capture_datetime import extract_capture_metadata
 
 DISPLAY_SPECIES = {
     "leopard": "Leopard",
@@ -284,9 +285,13 @@ def load_yolo_model(model_path):
 
 
 def with_capture_datetime(image_path, result):
-    captured_at, capture_date_source = extract_capture_datetime(image_path)
-    result.setdefault("capturedAt", captured_at)
-    result.setdefault("captureDateSource", capture_date_source)
+    metadata = extract_capture_metadata(image_path)
+    result.setdefault("capturedAt", metadata.get("capturedAt"))
+    result.setdefault("captureDateSource", metadata.get("captureDateSource"))
+    result.setdefault("cameraTrapCode", metadata.get("cameraTrapCode"))
+    result.setdefault("temperatureCelsius", metadata.get("temperatureCelsius"))
+    result.setdefault("temperatureFahrenheit", metadata.get("temperatureFahrenheit"))
+    result.setdefault("visibleMetadataText", metadata.get("visibleMetadataText"))
     return result
 
 

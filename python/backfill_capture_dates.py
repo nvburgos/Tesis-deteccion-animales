@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-from capture_datetime import capture_range, extract_capture_datetime
+from capture_datetime import capture_range, extract_capture_metadata
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -68,13 +68,14 @@ SELECT COUNT(*)
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = 'Detection'
-  AND column_name IN ('capturedAt', 'captureDateSource');
+  AND column_name IN ('capturedAt', 'captureDateSource', 'cameraTrapCode', 'temperatureCelsius', 'temperatureFahrenheit', 'visibleMetadataText');
 """
     count = int((run_psql(sql).strip() or "0").splitlines()[-1])
-    if count != 2:
+    if count < 2:
         raise RuntimeError(
             "La tabla Detection aun no tiene capturedAt/captureDateSource. Aplica primero la migracion no destructiva 20260719050000_add_detection_capture_datetime."
         )
+    return count == 6
 
 
 def resolve_image_path(image_path):
@@ -115,10 +116,20 @@ def fetch_detections(args):
     return rows
 
 
-def update_detection(detection_id, captured_at, source):
+def update_detection(detection_id, metadata, has_metadata_columns):
+    captured_at = metadata.get("capturedAt")
+    source = metadata.get("captureDateSource")
+    metadata_sql = ""
+    if has_metadata_columns:
+        metadata_sql = (
+            f', "cameraTrapCode" = {sql_literal(metadata.get("cameraTrapCode"))}'
+            f', "temperatureCelsius" = {sql_literal(metadata.get("temperatureCelsius"))}::double precision'
+            f', "temperatureFahrenheit" = {sql_literal(metadata.get("temperatureFahrenheit"))}::double precision'
+            f', "visibleMetadataText" = {sql_literal(metadata.get("visibleMetadataText"))}'
+        )
     sql = (
         'UPDATE "Detection" '
-        f'SET "capturedAt" = {sql_literal(captured_at)}::timestamp, "captureDateSource" = {sql_literal(source)} '
+        f'SET "capturedAt" = {sql_literal(captured_at)}::timestamp, "captureDateSource" = {sql_literal(source)}{metadata_sql} '
         f'WHERE "id" = {int(detection_id)};'
     )
     run_psql(sql, tuples_only=False)
@@ -133,7 +144,7 @@ def main():
     args = parser.parse_args()
 
     try:
-        ensure_capture_columns()
+        has_metadata_columns = ensure_capture_columns()
         rows = fetch_detections(args)
     except Exception as error:
         print(f"[backfill] No se puede iniciar: {error}", file=sys.stderr)
@@ -150,15 +161,20 @@ def main():
             print(f"[{index}/{len(rows)}] Detection {detection_id}: archivo no encontrado {row['imagePath']}")
             continue
 
-        captured_at, source = extract_capture_datetime(str(resolved_path), enable_ocr=True)
+        metadata = extract_capture_metadata(str(resolved_path), enable_ocr=True)
+        captured_at = metadata.get("capturedAt")
+        source = metadata.get("captureDateSource")
         if not captured_at:
             stats["unknown"] += 1
             print(f"[{index}/{len(rows)}] Detection {detection_id}: UNKNOWN")
             continue
 
-        print(f"[{index}/{len(rows)}] Detection {detection_id}: {captured_at} source={source} range={capture_range(captured_at)}")
+        print(
+            f"[{index}/{len(rows)}] Detection {detection_id}: {captured_at} source={source} "
+            f"camera={metadata.get('cameraTrapCode')} tempC={metadata.get('temperatureCelsius')} range={capture_range(captured_at)}"
+        )
         if not args.dry_run:
-            update_detection(detection_id, captured_at, source)
+            update_detection(detection_id, metadata, has_metadata_columns)
         stats["updated"] += 1
 
     print(json.dumps(stats, ensure_ascii=False, indent=2))

@@ -76,7 +76,12 @@ export default function CameraCard({ camera, onDelete, onEdit }: CameraCardProps
       <div className="cameraMetaList">
         <div>
           <MapPin size={17} />
-          <span>{camera.zone}</span>
+          <span>
+            {camera.zone}
+            {camera.latitude !== null && camera.latitude !== undefined && camera.longitude !== null && camera.longitude !== undefined
+              ? ` (${camera.latitude.toFixed(5)}, ${camera.longitude.toFixed(5)})`
+              : ''}
+          </span>
         </div>
         <div>
           <Images size={17} />

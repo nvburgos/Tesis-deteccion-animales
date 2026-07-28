@@ -8,6 +8,8 @@ export type Camera = {
   name: string
   zone: string
   description: string | null
+  latitude?: number | null
+  longitude?: number | null
   active: boolean
   createdAt: string
   updatedAt: string
@@ -30,9 +32,22 @@ export type DetectionResultData = {
   createdAt?: string
   capturedAt?: string | null
   captureDateSource?: string | null
+  cameraTrapCode?: string | null
+  temperatureCelsius?: number | null
+  temperatureFahrenheit?: number | null
+  visibleMetadataText?: string | null
   cameraId?: number | null
   batchJobId?: number | null
   camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
+  individualId?: number | null
+  individualMatchStatus?: string | null
+  individualMatchConfidence?: number | null
+  individualMatchBasis?: string | null
+  individual?: {
+    id: number
+    species: string
+    label: string | null
+  } | null
 }
 
 export type RecentDetection = {
@@ -45,10 +60,23 @@ export type RecentDetection = {
   createdAt: string
   capturedAt?: string | null
   captureDateSource?: string | null
+  cameraTrapCode?: string | null
+  temperatureCelsius?: number | null
+  temperatureFahrenheit?: number | null
+  visibleMetadataText?: string | null
   time?: string
   cameraId?: number | null
   batchJobId?: number | null
   camera?: Pick<Camera, 'id' | 'code' | 'name' | 'zone'> | null
+  individualId?: number | null
+  individualMatchStatus?: string | null
+  individualMatchConfidence?: number | null
+  individualMatchBasis?: string | null
+  individual?: {
+    id: number
+    species: string
+    label: string | null
+  } | null
   userId?: number | null
   researcher?: string
   researcherEmail?: string | null

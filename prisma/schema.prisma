@@ -34,6 +34,15 @@ model Detection {
   reviewVersion          Int       @default(0)
   capturedAt             DateTime?
   captureDateSource      String?
+  cameraTrapCode         String?
+  temperatureCelsius     Float?
+  temperatureFahrenheit  Float?
+  visibleMetadataText    String?
+  individualId           Int?
+  individual             Individual? @relation(fields: [individualId], references: [id], onDelete: SetNull)
+  individualMatchStatus  String?
+  individualMatchConfidence Float?
+  individualMatchBasis   String?
   createdAt              DateTime  @default(now())
 
   @@index([cameraId])
@@ -49,6 +58,22 @@ model Detection {
   @@index([cameraId, createdAt])
   @@index([cameraId, capturedAt])
   @@index([batchJobId, species])
+  @@index([individualId])
+  @@index([species, capturedAt])
+  @@index([cameraTrapCode])
+}
+
+model Individual {
+  id         Int         @id @default(autoincrement())
+  species    String
+  label      String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  detections Detection[]
+
+  @@index([species])
+  @@index([createdAt])
 }
 
 model BatchJob {
@@ -101,6 +126,8 @@ model Camera {
   name        String
   zone        String
   description String?
+  latitude    Float?
+  longitude   Float?
   active      Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

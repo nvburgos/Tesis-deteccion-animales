@@ -8,6 +8,7 @@ import { calculatePriority } from '@/lib/detections'
 import { prisma } from '@/lib/prisma'
 import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 import { getStorageRoot, toProtectedDetectionImagePath } from '@/lib/fileStorage'
+import { assignIndividualMatch } from '@/lib/individualMatching'
 
 const execFileAsync = promisify(execFile)
 const defaultMaxImageDimension = 1280
@@ -23,6 +24,10 @@ export type PredictionResult = {
   rawLabel?: string
   capturedAt?: string | null
   captureDateSource?: string | null
+  cameraTrapCode?: string | null
+  temperatureCelsius?: number | null
+  temperatureFahrenheit?: number | null
+  visibleMetadataText?: string | null
 }
 
 export type BatchPredictionResult = {
@@ -204,6 +209,7 @@ export async function createDetectionFromPrediction({
     data: {
       batchJobId,
       cameraId,
+      cameraTrapCode: prediction.cameraTrapCode ?? null,
       confidence: prediction.confidence,
       imagePath: publicPath,
       location,
@@ -211,6 +217,9 @@ export async function createDetectionFromPrediction({
       species: prediction.species,
       ...captureData,
       userId: owner.id,
+      temperatureCelsius: prediction.temperatureCelsius ?? null,
+      temperatureFahrenheit: prediction.temperatureFahrenheit ?? null,
+      visibleMetadataText: prediction.visibleMetadataText ?? null,
       x1: coordinates?.[0],
       y1: coordinates?.[1],
       x2: coordinates?.[2],
@@ -222,11 +231,19 @@ export async function createDetectionFromPrediction({
       createdAt: true,
       ...(hasCaptureColumns ? { capturedAt: true, captureDateSource: true } : {}),
       cameraId: true,
+      cameraTrapCode: true,
       imagePath: true,
       location: true,
       priority: true,
-      species: true
+      species: true,
+      temperatureCelsius: true,
+      temperatureFahrenheit: true,
+      visibleMetadataText: true
     }
+  })
+  const individualMatch = await assignIndividualMatch(detection.id).catch((error) => {
+    console.error('No se pudo asignar reencuentro para la deteccion:', error)
+    return null
   })
 
   return {
@@ -236,6 +253,7 @@ export async function createDetectionFromPrediction({
     capturedAt: detection.capturedAt?.toISOString() ?? null,
     captureDateSource: detection.captureDateSource,
     cameraId: detection.cameraId,
+    cameraTrapCode: detection.cameraTrapCode,
     imagePath: toProtectedDetectionImagePath(detection.id),
     location: detection.location,
     message: prediction.message,
@@ -243,6 +261,14 @@ export async function createDetectionFromPrediction({
     researcher: owner.name,
     species: detection.species,
     userId: owner.id,
+    temperatureCelsius: detection.temperatureCelsius,
+    temperatureFahrenheit: detection.temperatureFahrenheit,
+    visibleMetadataText: detection.visibleMetadataText,
+    individualId: individualMatch?.individualId ?? null,
+    individualMatchStatus: individualMatch?.individualMatchStatus ?? null,
+    individualMatchConfidence: individualMatch?.individualMatchConfidence ?? null,
+    individualMatchBasis: individualMatch?.individualMatchBasis ?? null,
+    individual: individualMatch?.individual ?? null,
     warning: prediction.warning
   }
 }

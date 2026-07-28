@@ -11,6 +11,23 @@ const {
   getStaleCutoff,
   getWorkerConfig
 } = require('./batch-worker-utils')
+const { assignIndividualMatchForPrisma } = require('./individual-matching-utils')
+
+function loadDotenv() {
+  const envPath = path.join(process.cwd(), '.env')
+  if (!existsSync(envPath)) return
+
+  const content = require('node:fs').readFileSync(envPath, 'utf8')
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+    const [key, ...valueParts] = trimmed.split('=')
+    const value = valueParts.join('=').trim().replace(/^['"]|['"]$/g, '')
+    if (!process.env[key]) process.env[key] = value
+  }
+}
+
+loadDotenv()
 
 const prisma = new PrismaClient()
 const execFileAsync = promisify(execFile)
@@ -270,10 +287,11 @@ async function createDetectionFromPrediction({ batchJobId, cameraId, location, o
     captureDateSource: prediction.captureDateSource || null
   } : {}
 
-  await prisma.detection.create({
+  const detection = await prisma.detection.create({
     data: {
       batchJobId,
       cameraId,
+      cameraTrapCode: prediction.cameraTrapCode || null,
       confidence: prediction.confidence,
       imagePath: publicPath,
       location,
@@ -281,6 +299,9 @@ async function createDetectionFromPrediction({ batchJobId, cameraId, location, o
       species: prediction.species,
       ...captureData,
       userId: owner.id,
+      temperatureCelsius: prediction.temperatureCelsius ?? null,
+      temperatureFahrenheit: prediction.temperatureFahrenheit ?? null,
+      visibleMetadataText: prediction.visibleMetadataText || null,
       x1: coordinates?.[0],
       y1: coordinates?.[1],
       x2: coordinates?.[2],
@@ -288,6 +309,7 @@ async function createDetectionFromPrediction({ batchJobId, cameraId, location, o
     },
     select: { id: true }
   })
+  await assignIndividualMatchForPrisma(prisma, detection.id).catch((error) => logException('[batch-worker] No se pudo asignar reencuentro', error))
 
   return { ms: performance.now() - start, skipped: false }
 }

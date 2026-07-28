@@ -1,3 +1,5 @@
+import { ecuadorSpeciesCatalog } from './ecuadorSpeciesCatalog'
+
 export type TaxonomicGroup = 'Mamifero' | 'Ave' | 'Reptil' | 'Anfibio' | 'Insecto' | 'Otro' | 'Sin clasificar'
 
 const taxonomyCatalog: Array<{ group: TaxonomicGroup; terms: string[] }> = [
@@ -62,6 +64,11 @@ export function getTaxonomicGroup(species: string | null | undefined): Taxonomic
     return 'Sin clasificar'
   }
 
+  const catalogMatch = ecuadorSpeciesCatalog.find((entry) => normalizeTaxonomyKey(entry.scientificName) === normalized)
+  if (catalogMatch) {
+    return catalogMatch.group
+  }
+
   const match = taxonomyCatalog.find((entry) => entry.terms.some((term) => normalized.includes(term)))
   return match?.group ?? 'Sin clasificar'
 }
@@ -73,7 +80,7 @@ export type SpeciesSuggestion = {
   rawLabel?: string
 }
 
-export const speciesSuggestions: SpeciesSuggestion[] = [
+const curatedSpeciesSuggestions: SpeciesSuggestion[] = [
   { label: 'South American Coati', value: 'South American Coati', group: 'Mamifero', rawLabel: 'South American Coati' },
   { label: 'Cabeza de mate', value: 'Tayra', group: 'Mamifero', rawLabel: 'Tayra' },
   { label: 'Ocelote', value: 'Ocelot', group: 'Mamifero', rawLabel: 'Ocelot' },
@@ -98,6 +105,29 @@ export const speciesSuggestions: SpeciesSuggestion[] = [
   { label: 'Especie no identificada', value: 'Unknown', group: 'Sin clasificar', rawLabel: 'Unknown' },
   { label: 'Imagen no evaluable', value: 'Imagen no evaluable', group: 'Sin clasificar' }
 ]
+
+const catalogSpeciesSuggestions: SpeciesSuggestion[] = ecuadorSpeciesCatalog.map((entry) => ({
+  label: entry.scientificName,
+  value: entry.scientificName,
+  group: entry.group,
+  rawLabel: entry.scientificName
+}))
+
+const seenSuggestionValues = new Set<string>()
+
+export const speciesSuggestions: SpeciesSuggestion[] = [
+  ...curatedSpeciesSuggestions,
+  ...catalogSpeciesSuggestions,
+].filter((suggestion) => {
+  const key = normalizeTaxonomyKey(suggestion.value)
+
+  if (seenSuggestionValues.has(key)) {
+    return false
+  }
+
+  seenSuggestionValues.add(key)
+  return true
+})
 
 export function getSpeciesSuggestion(value: string | null | undefined) {
   const normalized = normalizeTaxonomyKey(value)

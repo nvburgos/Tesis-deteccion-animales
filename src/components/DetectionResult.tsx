@@ -26,6 +26,10 @@ function getPriorityLabel(priority: Priority, language: Language) {
   return 'Normal'
 }
 
+function getIndividualLabel(result: DetectionResultData) {
+  return result.individual?.label ?? (result.individualId ? `Individuo #${result.individualId}` : null)
+}
+
 export default function DetectionResult({
   language = 'es',
   result,
@@ -72,6 +76,13 @@ export default function DetectionResult({
               <span>{text.priority}</span>
               <strong>{getPriorityLabel(result.priority, language)}</strong>
             </div>
+            {getIndividualLabel(result) ? (
+              <div>
+                <span>Individuo</span>
+                <strong>{getIndividualLabel(result)}</strong>
+                {result.individualMatchStatus ? <small>{result.individualMatchStatus}</small> : null}
+              </div>
+            ) : null}
           </div>
         </>
       ) : (

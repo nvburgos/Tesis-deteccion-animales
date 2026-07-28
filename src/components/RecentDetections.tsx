@@ -36,6 +36,20 @@ function formatConfidence(confidence: number) {
   return `${Math.round(percent)}%`
 }
 
+function getIndividualSummary(detection: RecentDetection) {
+  const label = detection.individual?.label ?? (detection.individualId ? `Individuo #${detection.individualId}` : null)
+
+  if (!label) {
+    return null
+  }
+
+  if (detection.individualMatchStatus) {
+    return `${label} · ${detection.individualMatchStatus}`
+  }
+
+  return label
+}
+
 export default function RecentDetections({
   detections,
   historyHref = '/historial',
@@ -80,6 +94,7 @@ export default function RecentDetections({
             {detections.length > 0 ? (
               detections.map((detection) => {
                 const speciesLabel = getSpeciesLabel(detection.species, language)
+                const individualSummary = getIndividualSummary(detection)
                 const locationLabel = detection.camera
                   ? `${detection.camera.code} · ${detection.camera.zone}`
                   : detection.location
@@ -99,6 +114,9 @@ export default function RecentDetections({
                     </td>
                     <td className="speciesCell">
                       {speciesLabel}
+                      {individualSummary ? (
+                        <span className="tableSubtext">{individualSummary}</span>
+                      ) : null}
                       {detection.manualReviewNote ? (
                         <span className="tableSubtext">Observacion: {detection.manualReviewNote}</span>
                       ) : null}

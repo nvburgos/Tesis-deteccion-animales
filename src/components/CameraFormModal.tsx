@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
+import CameraLocationPicker from './CameraLocationPicker'
 import type { CameraSummary } from './dashboardTypes'
 
 type CameraFormModalProps = {
@@ -20,7 +21,9 @@ const emptyForm = {
   name: '',
   code: '',
   zone: '',
-  description: ''
+  description: '',
+  latitude: '',
+  longitude: ''
 }
 
 export default function CameraFormModal({ camera, isOpen, onClose, onSaved }: CameraFormModalProps) {
@@ -40,7 +43,9 @@ export default function CameraFormModal({ camera, isOpen, onClose, onSaved }: Ca
             name: camera.name,
             code: camera.code,
             zone: camera.zone,
-            description: camera.description ?? ''
+            description: camera.description ?? '',
+            latitude: camera.latitude === null || camera.latitude === undefined ? '' : String(camera.latitude),
+            longitude: camera.longitude === null || camera.longitude === undefined ? '' : String(camera.longitude)
           }
         : emptyForm
     )
@@ -61,6 +66,24 @@ export default function CameraFormModal({ camera, isOpen, onClose, onSaved }: Ca
       return
     }
 
+    const hasLatitude = form.latitude.trim().length > 0
+    const hasLongitude = form.longitude.trim().length > 0
+    const latitude = Number(form.latitude)
+    const longitude = Number(form.longitude)
+
+    if (hasLatitude !== hasLongitude) {
+      setError('Selecciona latitud y longitud, o deja ambas vacias')
+      return
+    }
+
+    if (
+      (hasLatitude && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) ||
+      (hasLongitude && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))
+    ) {
+      setError('Coordenadas invalidas')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -71,7 +94,9 @@ export default function CameraFormModal({ camera, isOpen, onClose, onSaved }: Ca
           name: form.name.trim(),
           code: form.code.trim(),
           zone: form.zone.trim(),
-          description: form.description.trim()
+          description: form.description.trim(),
+          latitude: hasLatitude ? latitude : null,
+          longitude: hasLongitude ? longitude : null
         })
       })
       const data = (await response.json().catch(() => null)) as CameraResponse | null
@@ -141,6 +166,13 @@ export default function CameraFormModal({ camera, isOpen, onClose, onSaved }: Ca
               value={form.description}
             />
           </label>
+
+          <CameraLocationPicker
+            latitude={form.latitude}
+            longitude={form.longitude}
+            onChange={(coordinates) => setForm((current) => ({ ...current, ...coordinates }))}
+            onError={setError}
+          />
 
           <div className="modalActions">
             <button className="secondaryButton" onClick={onClose} type="button">
