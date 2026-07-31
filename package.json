@@ -15,6 +15,7 @@
                     "train:yolo":  ".venv\\Scripts\\python.exe python\\train.py",
                     "predict:yolo":  ".venv\\Scripts\\python.exe python\\predict.py",
                     "worker:batches":  "node scripts/batch-worker.js",
+                    "export:dataset":  "node scripts/export-curated-dataset.js",
                     "test":  "node --test tests/*.test.cjs"
                 },
     "dependencies":  {

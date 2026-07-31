@@ -11,7 +11,7 @@ function loadModule(relativePath) {
   source = source.replace(/export type[\s\S]*?\}\r?\n\r?\n/, '')
   source = source.replace(/export const /g, 'const ')
   source = source.replace(/export function /g, 'function ')
-  source += '\nmodule.exports = { invalidSpeciesValues, normalizeSpeciesName, isValidSpecies, isPositiveFaunaDetection, isPositiveDetection, isWithoutDetectionResult, isWithoutDetection, isValidDistinctSpecies, shouldRequireManualReview, getConfidenceBucket }\n'
+  source += '\nmodule.exports = { invalidSpeciesValues, normalizeSpeciesName, isValidSpecies, isBroadSpeciesLabel, isPositiveFaunaDetection, isPositiveDetection, isWithoutDetectionResult, isWithoutDetection, isValidDistinctSpecies, shouldRequireManualReview, getConfidenceBucket }\n'
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
   const module = { exports: {} }
   const localRequire = (specifier) => {
@@ -49,4 +49,11 @@ test('requires manual review for invalid or low-confidence results', () => {
   assert.equal(rules.shouldRequireManualReview({ species: 'Unknown', confidence: 99 }), true)
   assert.equal(rules.shouldRequireManualReview({ species: 'South American Coati', confidence: 90, priority: 'Normal' }), false)
   assert.equal(rules.shouldRequireManualReview({ species: 'South American Coati', confidence: 90, priority: 'Revision manual' }), true)
+})
+
+test('requires manual review for broad taxonomic labels', () => {
+  for (const species of ['Mammal', 'Rodent', 'Leopardus Species', 'Possum Family', 'Bird']) {
+    assert.equal(rules.isBroadSpeciesLabel(species), true)
+    assert.equal(rules.shouldRequireManualReview({ species, confidence: 85, priority: 'Normal' }), true)
+  }
 })

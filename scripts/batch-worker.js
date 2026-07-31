@@ -175,8 +175,9 @@ function normalizeSpecies(species) {
 function calculatePriority(species, confidence) {
   const threatenedSpecies = new Set(['jaguar', 'leopard', 'tapir amazonico', 'puma', 'ocelot', 'oso de anteojos', 'pecari'])
   const normalizedSpecies = normalizeSpecies(species)
+  const isBroadLabel = /\b(animal|mammal|bird|rodent|reptile|amphibian|fish|insect|family|species)\b/i.test(species)
 
-  if (normalizedSpecies === 'sin deteccion' || normalizedSpecies === 'unknown' || normalizedSpecies === 'no cv result' || confidence <= 0) {
+  if (normalizedSpecies === 'sin deteccion' || normalizedSpecies === 'unknown' || normalizedSpecies === 'no cv result' || confidence <= 0 || isBroadLabel) {
     return 'Revision manual'
   }
 

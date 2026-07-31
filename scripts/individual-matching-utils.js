@@ -1,3 +1,7 @@
+const { compareDetectionCrops } = require('./visual-signature-utils')
+const { existsSync } = require('node:fs')
+const path = require('node:path')
+
 const genericIndividualSpeciesPatterns = [
   /\bfamily\b/i,
   /\bspecies\b/i,
@@ -55,16 +59,55 @@ function formatDistance(distanceKm) {
   return `${distanceKm.toFixed(1)} km`
 }
 
+function getStorageRoot() {
+  return path.resolve(process.env.STORAGE_ROOT || path.join(process.cwd(), 'storage'))
+}
+
+function isInside(root, candidate) {
+  const relative = path.relative(root, candidate)
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
+}
+
+function resolveStoredDetectionPath(imagePath) {
+  const storageRoot = getStorageRoot()
+  const publicUploadsRoot = path.resolve(process.cwd(), 'public', 'uploads')
+  const normalized = String(imagePath || '').replace(/\\/g, '/')
+  const candidates = []
+
+  if (normalized.startsWith('/uploads/')) {
+    candidates.push(path.resolve(process.cwd(), 'public', normalized.slice(1)))
+    candidates.push(path.resolve(storageRoot, normalized.slice('/'.length)))
+  } else if (normalized.startsWith('uploads/')) {
+    candidates.push(path.resolve(storageRoot, normalized))
+    candidates.push(path.resolve(process.cwd(), 'public', normalized))
+  } else if (!path.isAbsolute(normalized) && !normalized.split('/').includes('..')) {
+    candidates.push(path.resolve(storageRoot, normalized))
+  }
+
+  return candidates.find((candidate) => {
+    const inStorage = isInside(storageRoot, candidate)
+    const inPublicUploads = isInside(publicUploadsRoot, candidate)
+    return (inStorage || inPublicUploads) && existsSync(candidate)
+  }) || null
+}
+
 function scoreIndividualCandidate(detection, candidate) {
   const basis = ['misma especie']
   let score = 35
+  const hours = Math.abs(getCaptureDate(detection).getTime() - getCaptureDate(candidate).getTime()) / 36e5
 
   if (detection.cameraId && candidate.cameraId && detection.cameraId === candidate.cameraId) {
-    score += 30
-    basis.push('misma camara')
+    if (hours <= 0.5) score += 28
+    else if (hours <= 6) score += 18
+    else if (hours <= 24) score += 10
+    else score += 4
+    basis.push(hours <= 24 ? 'misma camara en intervalo corto' : 'misma camara')
   } else if (detection.cameraTrapCode && candidate.cameraTrapCode && detection.cameraTrapCode === candidate.cameraTrapCode) {
-    score += 26
-    basis.push(`mismo codigo visible de camara ${detection.cameraTrapCode}`)
+    if (hours <= 0.5) score += 24
+    else if (hours <= 6) score += 16
+    else if (hours <= 24) score += 8
+    else score += 3
+    basis.push(hours <= 24 ? `mismo codigo visible de camara ${detection.cameraTrapCode} en intervalo corto` : `mismo codigo visible de camara ${detection.cameraTrapCode}`)
   } else if (
     detection.camera?.latitude !== null &&
     detection.camera?.latitude !== undefined &&
@@ -82,17 +125,15 @@ function scoreIndividualCandidate(detection, candidate) {
 
     basis.push(`distancia ${formatDistance(distanceKm)}`)
 
-    if (distanceKm <= 0.25) score += 30
-    else if (distanceKm <= 1) score += 24
-    else if (distanceKm <= 3) score += 16
-    else if (distanceKm <= 10) score += 8
+    if (distanceKm <= 0.25) score += hours <= 24 ? 26 : 12
+    else if (distanceKm <= 1) score += hours <= 24 ? 20 : 9
+    else if (distanceKm <= 3) score += hours <= 24 ? 12 : 5
+    else if (distanceKm <= 10) score += hours <= 24 ? 6 : 2
     else score -= 20
   } else if (detection.camera?.zone && candidate.camera?.zone && detection.camera.zone === candidate.camera.zone) {
-    score += 8
+    score += hours <= 24 ? 6 : 2
     basis.push('misma zona')
   }
-
-  const hours = Math.abs(getCaptureDate(detection).getTime() - getCaptureDate(candidate).getTime()) / 36e5
 
   if (hours <= 0.5) {
     score += 25
@@ -109,6 +150,19 @@ function scoreIndividualCandidate(detection, candidate) {
   } else if (hours <= 24 * 14) {
     score += 4
     basis.push('menos de 14 dias')
+  }
+
+  if (Number.isFinite(candidate.visualSimilarity)) {
+    if (candidate.visualSimilarity >= 82) {
+      score += 18
+      basis.push(`patron visual similar ${Math.round(candidate.visualSimilarity)}%`)
+    } else if (candidate.visualSimilarity >= 68) {
+      score += 10
+      basis.push(`patron visual compatible ${Math.round(candidate.visualSimilarity)}%`)
+    } else if (candidate.visualSimilarity <= 42) {
+      score -= 14
+      basis.push(`patron visual distinto ${Math.round(candidate.visualSimilarity)}%`)
+    }
   }
 
   score += Math.min(10, Math.max(0, candidate.confidence / 10))
@@ -141,9 +195,14 @@ async function assignIndividualMatchForPrisma(prisma, detectionId, env = process
       createdAt: true,
       capturedAt: true,
       id: true,
+      imagePath: true,
       individualId: true,
       species: true,
       userId: true,
+      x1: true,
+      x2: true,
+      y1: true,
+      y2: true,
       camera: { select: { id: true, latitude: true, longitude: true, zone: true } }
     }
   })
@@ -179,11 +238,26 @@ async function assignIndividualMatchForPrisma(prisma, detectionId, env = process
       createdAt: true,
       capturedAt: true,
       id: true,
+      imagePath: true,
       individualId: true,
+      x1: true,
+      x2: true,
+      y1: true,
+      y2: true,
       camera: { select: { id: true, latitude: true, longitude: true, zone: true } }
     }
   })
-  const best = candidates
+  const resolveImagePath = typeof env.resolveImagePath === 'function' ? env.resolveImagePath : resolveStoredDetectionPath
+  const detectionPath = resolveImagePath?.(detection.imagePath)
+  const candidatesWithVisualSimilarity = await Promise.all(candidates.map(async (candidate) => {
+    const candidatePath = resolveImagePath?.(candidate.imagePath)
+    const visualSimilarity = detectionPath && candidatePath
+      ? await compareDetectionCrops(detectionPath, detection, candidatePath, candidate).catch(() => null)
+      : null
+
+    return { ...candidate, visualSimilarity }
+  }))
+  const best = candidatesWithVisualSimilarity
     .map((candidate) => scoreIndividualCandidate(detection, candidate))
     .sort((first, second) => second.score - first.score)[0]
 

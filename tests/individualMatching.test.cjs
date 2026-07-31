@@ -33,7 +33,31 @@ test('scores same camera and close capture time as probable reencounter', () => 
   }, candidate)
 
   assert.equal(result.score >= 65, true)
-  assert.deepEqual(result.basis.includes('misma camara'), true)
+  assert.deepEqual(result.basis.includes('misma camara en intervalo corto'), true)
+})
+
+test('does not treat same camera after many days as enough evidence', () => {
+  const candidate = {
+    cameraId: 1,
+    camera: { id: 1, latitude: -2.18, longitude: -79.88, zone: 'Bosque' },
+    capturedAt: new Date('2026-07-01T09:45:00.000Z'),
+    confidence: 86,
+    createdAt: new Date('2026-07-01T09:45:00.000Z'),
+    id: 1,
+    individualId: 7
+  }
+  const result = scoreIndividualCandidate({
+    ...candidate,
+    capturedAt: new Date('2026-07-14T10:00:00.000Z'),
+    createdAt: new Date('2026-07-14T10:00:00.000Z'),
+    id: 2,
+    individualId: null,
+    species: 'Ocelot',
+    userId: 1
+  }, candidate)
+
+  assert.equal(result.score < 65, true)
+  assert.equal(result.basis.includes('misma camara'), true)
 })
 
 test('penalizes distant cameras with weak time evidence', () => {
@@ -62,6 +86,89 @@ test('penalizes distant cameras with weak time evidence', () => {
   assert.equal(result.score < 65, true)
 })
 
+test('allows nearby cameras with plausible timing as probable reencounter', () => {
+  const detection = {
+    cameraId: 1,
+    camera: { id: 1, latitude: -2.1800, longitude: -79.8800, zone: 'Bosque' },
+    capturedAt: new Date('2026-07-27T10:00:00.000Z'),
+    confidence: 88,
+    createdAt: new Date('2026-07-27T10:00:00.000Z'),
+    id: 2,
+    individualId: null,
+    species: 'Ocelot',
+    userId: 1
+  }
+  const candidate = {
+    cameraId: 2,
+    camera: { id: 2, latitude: -2.1810, longitude: -79.8810, zone: 'Bosque' },
+    capturedAt: new Date('2026-07-27T07:00:00.000Z'),
+    confidence: 90,
+    createdAt: new Date('2026-07-27T07:00:00.000Z'),
+    id: 1,
+    individualId: 4
+  }
+  const result = scoreIndividualCandidate(detection, candidate)
+
+  assert.equal(result.score >= 65, true)
+})
+
+test('adds visual evidence when crop pattern is similar', () => {
+  const baseDetection = {
+    cameraId: 1,
+    camera: { id: 1, latitude: -2.18, longitude: -79.88, zone: 'Bosque' },
+    capturedAt: new Date('2026-07-27T10:00:00.000Z'),
+    confidence: 88,
+    createdAt: new Date('2026-07-27T10:00:00.000Z'),
+    id: 2,
+    individualId: null,
+    species: 'Ocelot',
+    userId: 1
+  }
+  const withoutVisual = scoreIndividualCandidate(baseDetection, {
+    ...baseDetection,
+    capturedAt: new Date('2026-07-27T09:00:00.000Z'),
+    id: 1,
+    individualId: 4
+  })
+  const withVisual = scoreIndividualCandidate(baseDetection, {
+    ...baseDetection,
+    capturedAt: new Date('2026-07-27T09:00:00.000Z'),
+    id: 1,
+    individualId: 4,
+    visualSimilarity: 86
+  })
+
+  assert.equal(withVisual.score > withoutVisual.score, true)
+  assert.equal(withVisual.basis.includes('patron visual similar 86%'), true)
+})
+
+test('penalizes visually different crop pattern', () => {
+  const detection = {
+    cameraId: 1,
+    camera: { id: 1, latitude: -2.18, longitude: -79.88, zone: 'Bosque' },
+    capturedAt: new Date('2026-07-27T10:00:00.000Z'),
+    confidence: 88,
+    createdAt: new Date('2026-07-27T10:00:00.000Z'),
+    id: 2,
+    individualId: null,
+    species: 'Ocelot',
+    userId: 1
+  }
+  const result = scoreIndividualCandidate(detection, {
+    cameraId: 2,
+    camera: { id: 2, latitude: -2.1810, longitude: -79.8810, zone: 'Bosque' },
+    capturedAt: new Date('2026-07-27T07:00:00.000Z'),
+    confidence: 90,
+    createdAt: new Date('2026-07-27T07:00:00.000Z'),
+    id: 1,
+    individualId: 4,
+    visualSimilarity: 25
+  })
+
+  assert.equal(result.basis.includes('patron visual distinto 25%'), true)
+})
+
+
 test('uses visible camera code when camera relation is missing', () => {
   const capturedAt = new Date('2026-07-27T10:00:00.000Z')
   const candidate = {
@@ -84,5 +191,5 @@ test('uses visible camera code when camera relation is missing', () => {
   }, candidate)
 
   assert.equal(result.score >= 65, true)
-  assert.equal(result.basis.includes('mismo codigo visible de camara 0001'), true)
+  assert.equal(result.basis.includes('mismo codigo visible de camara 0001 en intervalo corto'), true)
 })

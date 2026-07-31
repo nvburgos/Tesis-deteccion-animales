@@ -78,6 +78,29 @@ export type SpeciesSuggestion = {
   value: string
   group: TaxonomicGroup
   rawLabel?: string
+  commonNameEn?: string
+  commonNameEs?: string
+  scientificName?: string
+}
+
+const catalogCommonNames: Record<string, { commonNameEn?: string; commonNameEs?: string }> = {
+  'cuniculus paca': { commonNameEn: 'Lowland paca', commonNameEs: 'Guanta' },
+  'dasyprocta fuliginosa': { commonNameEn: 'Black agouti', commonNameEs: 'Guatusa negra' },
+  'dasyprocta punctata': { commonNameEn: 'Central American agouti', commonNameEs: 'Guatusa' },
+  'didelphis marsupialis': { commonNameEn: 'Common opossum', commonNameEs: 'Zarigueya comun' },
+  'eira barbara': { commonNameEn: 'Tayra', commonNameEs: 'Cabeza de mate' },
+  'leopardus pardalis': { commonNameEn: 'Ocelot', commonNameEs: 'Ocelote' },
+  'leopardus wiedii': { commonNameEn: 'Margay', commonNameEs: 'Tigrillo' },
+  'mazama americana': { commonNameEn: 'Red brocket', commonNameEs: 'Venado colorado' },
+  'nasua nasua': { commonNameEn: 'South American coati', commonNameEs: 'Coati sudamericano' },
+  'panthera onca': { commonNameEn: 'Jaguar', commonNameEs: 'Jaguar' },
+  'pecari tajacu': { commonNameEn: 'Collared peccary', commonNameEs: 'Pecari de collar' },
+  'puma concolor': { commonNameEn: 'Puma', commonNameEs: 'Puma' },
+  'tapirus pinchaque': { commonNameEn: 'Mountain tapir', commonNameEs: 'Tapir andino' },
+  'tapirus terrestris': { commonNameEn: 'Lowland tapir', commonNameEs: 'Tapir amazonico' },
+  'tamandua tetradactyla': { commonNameEn: 'Southern tamandua', commonNameEs: 'Tamandua del sur' },
+  'tayassu pecari': { commonNameEn: 'White-lipped peccary', commonNameEs: 'Pecari de labio blanco' },
+  'tremarctos ornatus': { commonNameEn: 'Spectacled bear', commonNameEs: 'Oso de anteojos' }
 }
 
 const curatedSpeciesSuggestions: SpeciesSuggestion[] = [
@@ -106,12 +129,18 @@ const curatedSpeciesSuggestions: SpeciesSuggestion[] = [
   { label: 'Imagen no evaluable', value: 'Imagen no evaluable', group: 'Sin clasificar' }
 ]
 
-const catalogSpeciesSuggestions: SpeciesSuggestion[] = ecuadorSpeciesCatalog.map((entry) => ({
-  label: entry.scientificName,
-  value: entry.scientificName,
-  group: entry.group,
-  rawLabel: entry.scientificName
-}))
+const catalogSpeciesSuggestions: SpeciesSuggestion[] = ecuadorSpeciesCatalog.map((entry) => {
+  const commonNames = catalogCommonNames[normalizeTaxonomyKey(entry.scientificName)]
+
+  return {
+    label: commonNames?.commonNameEs ?? commonNames?.commonNameEn ?? entry.scientificName,
+    value: entry.scientificName,
+    group: entry.group,
+    rawLabel: entry.scientificName,
+    scientificName: entry.scientificName,
+    ...commonNames
+  }
+})
 
 const seenSuggestionValues = new Set<string>()
 
@@ -131,7 +160,14 @@ export const speciesSuggestions: SpeciesSuggestion[] = [
 
 export function getSpeciesSuggestion(value: string | null | undefined) {
   const normalized = normalizeTaxonomyKey(value)
-  return speciesSuggestions.find((suggestion) => normalizeTaxonomyKey(suggestion.value) === normalized || normalizeTaxonomyKey(suggestion.label) === normalized)
+  return speciesSuggestions.find((suggestion) =>
+    normalizeTaxonomyKey(suggestion.value) === normalized ||
+    normalizeTaxonomyKey(suggestion.label) === normalized ||
+    normalizeTaxonomyKey(suggestion.rawLabel) === normalized ||
+    normalizeTaxonomyKey(suggestion.commonNameEn) === normalized ||
+    normalizeTaxonomyKey(suggestion.commonNameEs) === normalized ||
+    normalizeTaxonomyKey(suggestion.scientificName) === normalized
+  )
 }
 
 export type IdentificationLevel = 'species' | 'family' | 'genus' | 'general' | 'taxonomic_group' | 'unclassified'

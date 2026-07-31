@@ -6,6 +6,41 @@ El objetivo del sistema es permitir que un usuario cargue una imagen tomada por 
 
 ## Estado actual del proyecto
 
+### Resumen actualizado al 2026-07-31
+
+WildlifeAI ya funciona como una plataforma integrada para camaras trampa con:
+
+- Analisis individual y por lotes con SpeciesNet como flujo principal.
+- Worker de lotes separado (`npm run worker:batches`) con heartbeat, reintentos y recuperacion de tareas atascadas.
+- Registro de camaras con coordenadas en mapa, centrado inicial en Guayaquil.
+- OCR opcional de la franja visible de las fotos para extraer fecha/hora, temperatura y codigo visible de camara cuando la imagen lo trae impreso.
+- Catalogo local de especies de Ecuador generado desde los PDF de mamiferos, aves y reptiles/anfibios/aves del proyecto.
+- Comparacion de cobertura entre el catalogo ecuatoriano y las etiquetas/taxonomia de SpeciesNet.
+- Bandeja de revision manual inteligente para casos ambiguos, de baja confianza o con etiquetas amplias como `Mammal`, `Rodent`, `Leopardus Species`, `Possum Family`.
+- Buscador de especies enriquecido con nombres comunes en espanol/ingles y nombres cientificos.
+- Exportacion de dataset curado a partir de detecciones revisadas/corregidas por investigadores.
+- Identificacion tentativa de individuos/reencuentros mediante especie, tiempo, camara, codigo OCR, distancia entre camaras y similitud visual ligera del recorte del animal.
+- Vista de individuos supuestos dentro del detalle de especie, con opcion de nombrar animales y comparar dos fotos con decisiones `Mismo individuo`, `Distinto` o `Inseguro`.
+
+Estado importante de IA:
+
+- SpeciesNet sigue siendo el detector/clasificador principal.
+- El sistema no pretende detectar automaticamente todas las especies del catalogo ecuatoriano con precision perfecta.
+- La estrategia actual es hibrida: SpeciesNet propone, el investigador corrige solo casos importantes/ambiguos, y esas correcciones alimentan un dataset curado.
+- La reidentificacion de individuos todavia no es un modelo profundo especializado por manchas o patrones corporales. La version actual usa una heuristica mejorada y una firma visual ligera basada en el recorte del bounding box. Es util como preclasificacion y como apoyo a revision humana, no como confirmacion cientifica definitiva sin validacion.
+
+Validacion reciente:
+
+```text
+npm run typecheck -> correcto
+npm test -> 40 pruebas correctas
+npm run build -> correcto
+```
+
+Advertencia conocida no bloqueante:
+
+- `next build` muestra una advertencia de Turbopack/NFT relacionada con tracing desde `next.config.ts` hacia `src/app/api/batches/[id]/route.ts`. La compilacion finaliza correctamente.
+
 El proyecto tiene una interfaz web funcional en Next.js con React y TypeScript. La pantalla principal ya esta adaptada como dashboard de deteccion de vida silvestre:
 
 - Permite seleccionar o arrastrar una imagen.
@@ -1502,3 +1537,134 @@ Debe usarse para monitorear:
 - `AUTH_SECRET` real configurado.
 - `ALLOW_PUBLIC_REGISTRATION=false` salvo decision explicita.
 - HTTPS/proxy configurado antes de exponer la aplicacion.
+
+## Actualizacion 2026-07-31: revision inteligente, dataset curado e individuos
+
+Esta actualizacion registra el estado actual posterior a las mejoras de especies, revision humana asistida e identificacion tentativa de individuos.
+
+### Revision inteligente de especies
+
+La plataforma ahora manda a revision manual los resultados demasiado amplios o ambiguos, incluso cuando SpeciesNet detecta fauna con confianza razonable. Ejemplos:
+
+- `Mammal`
+- `Rodent`
+- `Bird`
+- `Leopardus Species`
+- `Didelphis Species`
+- `Possum Family`
+- `Weasel Family`
+
+El panel `ManualReviewsPanel` prioriza la cola por motivo de revision:
+
+- etiqueta amplia;
+- baja confianza;
+- prioridad alta;
+- ausencia de bounding box;
+- validacion requerida.
+
+Tambien muestra filtros rapidos y sugerencias de especies probables para acelerar correcciones. Las sugerencias son reglas de apoyo basadas en el catalogo local, no una prediccion adicional de IA.
+
+### Busqueda de especies por nombre comun y cientifico
+
+El catalogo de sugerencias ahora permite buscar especies por:
+
+- nombre comun en espanol;
+- nombre comun en ingles;
+- nombre cientifico;
+- etiqueta original.
+
+Ejemplos soportados:
+
+- `Ocelote` / `Ocelot` / `Leopardus pardalis`
+- `Tigrillo` / `Margay` / `Leopardus wiedii`
+- `Tapir amazonico` / `Lowland tapir` / `Tapirus terrestris`
+- `Guanta` / `Lowland paca` / `Cuniculus paca`
+- `Cabeza de mate` / `Tayra` / `Eira barbara`
+
+### Dataset curado
+
+Se agrego exportacion de dataset curado desde detecciones revisadas:
+
+```bash
+npm run export:dataset
+```
+
+Tambien existe endpoint CSV:
+
+```text
+GET /api/datasets/curated
+```
+
+El dataset curado usa registros con revision humana confirmada o corregida. Esto permite convertir el trabajo normal del investigador en datos reutilizables para entrenamiento o evaluacion futura.
+
+### Reencuentros e individuos supuestos
+
+El modelo `Individual` ya esta conectado con `Detection`. Cada deteccion puede guardar:
+
+- `individualId`
+- `individualMatchStatus`
+- `individualMatchConfidence`
+- `individualMatchBasis`
+
+El matcher automatico usa una heuristica combinada:
+
+- misma especie;
+- intervalo temporal entre capturas;
+- misma camara solo como evidencia fuerte si el intervalo es corto;
+- codigo visible de camara extraido por OCR;
+- distancia entre camaras cuando existen coordenadas;
+- zona como respaldo debil;
+- confianza del candidato;
+- similitud visual ligera del recorte del animal.
+
+La regla fue ajustada para evitar asumir que el mismo animal reaparece solo porque esta en la misma camara despues de muchos dias. Camaras distintas pero cercanas pueden sumar evidencia si el intervalo temporal es plausible.
+
+### Comparacion visual de individuos
+
+En el detalle de especie, dentro del apartado `Individuos supuestos`, el investigador puede:
+
+- ver grupos de individuos propuestos;
+- poner nombre a un individuo;
+- comparar dos fotos lado a lado;
+- decidir `Mismo individuo`, `Distinto` o `Inseguro`.
+
+La comparacion muestra:
+
+- porcentaje de similitud visual del recorte;
+- diferencia de tiempo entre capturas;
+- si las detecciones vienen de la misma camara o de camaras distintas.
+
+La similitud visual actual se calcula con `sharp` a partir del bounding box. Se recorta el animal, se normaliza una firma visual pequena y se compara con similitud coseno. Esta tecnica es ligera y util como apoyo, pero no reemplaza un modelo especializado de reidentificacion visual.
+
+### Archivos principales agregados o modificados
+
+- `src/components/ManualReviewsPanel.tsx`
+- `src/components/SpeciesGallery.tsx`
+- `src/app/api/individuals/[id]/route.ts`
+- `src/app/api/individuals/review/route.ts`
+- `src/app/api/datasets/curated/route.ts`
+- `src/lib/individualMatching.ts`
+- `src/lib/visualSignature.ts`
+- `scripts/individual-matching-utils.js`
+- `scripts/visual-signature-utils.js`
+- `scripts/export-curated-dataset.js`
+- `src/lib/detectionClassification.ts`
+- `src/lib/speciesTaxonomy.ts`
+- `src/lib/i18n.ts`
+- `tests/individualMatching.test.cjs`
+- `tests/detectionClassification.test.cjs`
+- `tests/speciesTaxonomyCatalog.test.cjs`
+
+### Estado de validacion
+
+Ultima validacion local:
+
+```text
+npm run typecheck -> correcto
+npm test -> 40 pruebas correctas
+npm run build -> correcto
+```
+
+Advertencia conocida:
+
+- `npm run build` muestra una advertencia no bloqueante de Turbopack/NFT sobre tracing desde `next.config.ts` hacia la ruta de batches. La compilacion termina correctamente.

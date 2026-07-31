@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client'
+import { resolveStoredDetectionPath } from '@/lib/fileStorage'
 import { prisma } from '@/lib/prisma'
+import { compareDetectionCrops } from '@/lib/visualSignature'
 
 const genericSpeciesPatterns = [
   /\bfamily\b/i,
@@ -23,12 +25,18 @@ const invalidSpecies = new Set([
 
 type CandidateDetection = {
   id: number
+  imagePath: string
   confidence: number
   createdAt: Date
   capturedAt: Date | null
   cameraTrapCode: string | null
   cameraId: number | null
   individualId: number | null
+  x1: number | null
+  y1: number | null
+  x2: number | null
+  y2: number | null
+  visualSimilarity?: number | null
   camera: {
     id: number
     zone: string
@@ -88,13 +96,22 @@ function formatDistance(distanceKm: number) {
 function scoreCandidate(detection: MatchDetection, candidate: CandidateDetection) {
   const basis: string[] = ['misma especie']
   let score = 35
+  const detectionDate = getCaptureDate(detection)
+  const candidateDate = getCaptureDate(candidate)
+  const hours = Math.abs(detectionDate.getTime() - candidateDate.getTime()) / 36e5
 
   if (detection.cameraId && candidate.cameraId && detection.cameraId === candidate.cameraId) {
-    score += 30
-    basis.push('misma camara')
+    if (hours <= 0.5) score += 28
+    else if (hours <= 6) score += 18
+    else if (hours <= 24) score += 10
+    else score += 4
+    basis.push(hours <= 24 ? 'misma camara en intervalo corto' : 'misma camara')
   } else if (detection.cameraTrapCode && candidate.cameraTrapCode && detection.cameraTrapCode === candidate.cameraTrapCode) {
-    score += 26
-    basis.push(`mismo codigo visible de camara ${detection.cameraTrapCode}`)
+    if (hours <= 0.5) score += 24
+    else if (hours <= 6) score += 16
+    else if (hours <= 24) score += 8
+    else score += 3
+    basis.push(hours <= 24 ? `mismo codigo visible de camara ${detection.cameraTrapCode} en intervalo corto` : `mismo codigo visible de camara ${detection.cameraTrapCode}`)
   } else if (
     detection.camera?.latitude !== null &&
     detection.camera?.latitude !== undefined &&
@@ -112,19 +129,15 @@ function scoreCandidate(detection: MatchDetection, candidate: CandidateDetection
 
     basis.push(`distancia ${formatDistance(distanceKm)}`)
 
-    if (distanceKm <= 0.25) score += 30
-    else if (distanceKm <= 1) score += 24
-    else if (distanceKm <= 3) score += 16
-    else if (distanceKm <= 10) score += 8
+    if (distanceKm <= 0.25) score += hours <= 24 ? 26 : 12
+    else if (distanceKm <= 1) score += hours <= 24 ? 20 : 9
+    else if (distanceKm <= 3) score += hours <= 24 ? 12 : 5
+    else if (distanceKm <= 10) score += hours <= 24 ? 6 : 2
     else score -= 20
   } else if (detection.camera?.zone && candidate.camera?.zone && detection.camera.zone === candidate.camera.zone) {
-    score += 8
+    score += hours <= 24 ? 6 : 2
     basis.push('misma zona')
   }
-
-  const detectionDate = getCaptureDate(detection)
-  const candidateDate = getCaptureDate(candidate)
-  const hours = Math.abs(detectionDate.getTime() - candidateDate.getTime()) / 36e5
 
   if (hours <= 0.5) {
     score += 25
@@ -141,6 +154,20 @@ function scoreCandidate(detection: MatchDetection, candidate: CandidateDetection
   } else if (hours <= 24 * 14) {
     score += 4
     basis.push('menos de 14 dias')
+  }
+
+  if (Number.isFinite(candidate.visualSimilarity)) {
+    const visualSimilarity = Number(candidate.visualSimilarity)
+    if (visualSimilarity >= 82) {
+      score += 18
+      basis.push(`patron visual similar ${Math.round(visualSimilarity)}%`)
+    } else if (visualSimilarity >= 68) {
+      score += 10
+      basis.push(`patron visual compatible ${Math.round(visualSimilarity)}%`)
+    } else if (visualSimilarity <= 42) {
+      score -= 14
+      basis.push(`patron visual distinto ${Math.round(visualSimilarity)}%`)
+    }
   }
 
   score += Math.min(10, Math.max(0, candidate.confidence / 10))
@@ -176,9 +203,14 @@ export async function assignIndividualMatch(detectionId: number) {
       capturedAt: true,
       cameraTrapCode: true,
       id: true,
+      imagePath: true,
       individualId: true,
       species: true,
       userId: true,
+      x1: true,
+      x2: true,
+      y1: true,
+      y2: true,
       camera: {
         select: {
           id: true,
@@ -223,7 +255,12 @@ export async function assignIndividualMatch(detectionId: number) {
       capturedAt: true,
       cameraTrapCode: true,
       id: true,
+      imagePath: true,
       individualId: true,
+      x1: true,
+      x2: true,
+      y1: true,
+      y2: true,
       camera: {
         select: {
           id: true,
@@ -234,7 +271,16 @@ export async function assignIndividualMatch(detectionId: number) {
       }
     }
   })
-  const best = candidates
+  const detectionPath = resolveStoredDetectionPath(detection.imagePath)
+  const candidatesWithVisualSimilarity = await Promise.all(candidates.map(async (candidate) => {
+    const candidatePath = resolveStoredDetectionPath(candidate.imagePath)
+    const visualSimilarity = detectionPath && candidatePath
+      ? await compareDetectionCrops(detectionPath, detection, candidatePath, candidate).catch(() => null)
+      : null
+
+    return { ...candidate, visualSimilarity }
+  }))
+  const best = candidatesWithVisualSimilarity
     .map((candidate) => scoreCandidate(detection, candidate))
     .sort((first, second) => second.score - first.score)[0]
 

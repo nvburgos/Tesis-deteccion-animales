@@ -59,3 +59,11 @@ test('uses catalog scientific names in taxonomy and manual review suggestions', 
   assert.equal(taxonomy.getSpeciesSuggestion('Panthera onca')?.group, 'Mamifero')
   assert.equal(taxonomy.speciesSuggestions.some((suggestion) => suggestion.value === 'Ara ambiguus'), true)
 })
+
+test('finds enriched catalog species by common names when available', () => {
+  const taxonomy = loadSpeciesTaxonomy()
+
+  assert.equal(taxonomy.getSpeciesSuggestion('Tapir amazonico')?.value, 'Tapirus terrestris')
+  assert.equal(taxonomy.getSpeciesSuggestion('Leopardus pardalis')?.label, 'Ocelote')
+  assert.equal(taxonomy.getSpeciesSuggestion('lowland tapir')?.value, 'Tapirus terrestris')
+})

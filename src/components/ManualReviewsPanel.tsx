@@ -106,6 +106,87 @@ function buildReviewNote(baseNote: string, marker: string) {
   return trimmed ? `${marker}: ${trimmed}` : marker
 }
 
+type SpeciesOption = {
+  label: string
+  value: string
+  group: TaxonomicGroup
+  rawLabel?: string
+  commonNameEn?: string
+  commonNameEs?: string
+  scientificName?: string
+}
+
+type ReviewQueueFilter = 'all' | 'broad' | 'lowConfidence' | 'priority'
+
+const broadReviewLabels = new Set([
+  'animal',
+  'mammal',
+  'bird',
+  'rodent',
+  'reptile',
+  'amphibian',
+  'fish',
+  'insect',
+  'leopardus species',
+  'didelphis species',
+  'possum family',
+  'weasel family'
+])
+
+const quickSuggestionValues: Record<string, string[]> = {
+  'didelphis species': ['Didelphis marsupialis'],
+  'leopardus species': ['Leopardus pardalis', 'Leopardus wiedii'],
+  mammal: [
+    'Leopardus pardalis',
+    'Leopardus wiedii',
+    'Tapirus terrestris',
+    'Tamandua tetradactyla',
+    'Didelphis marsupialis',
+    'Pecari tajacu',
+    'Nasua nasua'
+  ],
+  'possum family': ['Didelphis marsupialis'],
+  rodent: ['Cuniculus paca', 'Dasyprocta punctata', 'Dasyprocta fuliginosa'],
+  'weasel family': ['Eira barbara']
+}
+
+function isBroadReviewSpecies(species?: string | null) {
+  const normalized = normalizeTaxonomyKey(species ?? '')
+  return broadReviewLabels.has(normalized) || normalized.endsWith(' family') || normalized.endsWith(' species')
+}
+
+function getConfidencePercent(confidence = 0) {
+  return confidence <= 1 ? confidence * 100 : confidence
+}
+
+function getReviewReasons(detection: RecentDetection) {
+  const reasons: string[] = []
+  if (isBroadReviewSpecies(detection.species)) reasons.push('Etiqueta amplia')
+  if (getConfidencePercent(detection.confidence) <= 70) reasons.push('Baja confianza')
+  if (detection.priority === 'Alta prioridad') reasons.push('Alta prioridad')
+  if (!hasBoundingBox(detection)) reasons.push('Sin cuadro')
+  if (!reasons.length) reasons.push('Validacion requerida')
+  return reasons
+}
+
+function getReviewScore(detection: RecentDetection) {
+  let score = 0
+  if (isBroadReviewSpecies(detection.species)) score += 60
+  const confidence = getConfidencePercent(detection.confidence)
+  if (confidence <= 40) score += 30
+  else if (confidence <= 70) score += 18
+  if (detection.priority === 'Alta prioridad') score += 20
+  if (!hasBoundingBox(detection)) score += 10
+  return score
+}
+
+function getQuickSuggestions(detection: RecentDetection, options: SpeciesOption[]) {
+  const normalized = normalizeTaxonomyKey(detection.species)
+  const values = quickSuggestionValues[normalized] ?? []
+  const byValue = new Map(options.map((option) => [normalizeTaxonomyKey(option.value), option]))
+  return values.map((value) => byValue.get(normalizeTaxonomyKey(value))).filter(Boolean) as SpeciesOption[]
+}
+
 function SpeciesAutocomplete({
   group,
   onGroupChange,
@@ -116,7 +197,7 @@ function SpeciesAutocomplete({
   group: TaxonomicGroup
   onGroupChange: (group: TaxonomicGroup) => void
   onSpeciesChange: (species: string) => void
-  options: Array<{ label: string; value: string; group: TaxonomicGroup; rawLabel?: string }>
+  options: SpeciesOption[]
   species: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -124,7 +205,7 @@ function SpeciesAutocomplete({
   const filteredOptions = options
     .filter((option) => {
       if (!normalizedQuery) return true
-      return normalizeTaxonomyKey(`${option.label} ${option.value} ${option.rawLabel ?? ''}`).includes(normalizedQuery)
+      return normalizeTaxonomyKey(`${option.label} ${option.value} ${option.rawLabel ?? ''} ${option.commonNameEn ?? ''} ${option.commonNameEs ?? ''} ${option.scientificName ?? ''}`).includes(normalizedQuery)
     })
     .slice(0, 8)
 
@@ -160,7 +241,8 @@ function SpeciesAutocomplete({
           {filteredOptions.map((option) => (
             <button key={`${option.value}-${option.label}`} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value, option.group)} type="button">
               <strong>{option.label}</strong>
-              <span>{option.group}{option.rawLabel ? ` | ${option.rawLabel}` : ''}</span>
+              <span>{option.group}{option.value !== option.label ? ` | ${option.value}` : ''}</span>
+              {option.commonNameEn && option.commonNameEn !== option.label ? <small>{option.commonNameEn}</small> : null}
             </button>
           ))}
         </div>
@@ -341,18 +423,37 @@ export default function ManualReviewsPanel({
   const [savingId, setSavingId] = useState<number | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [showQueue, setShowQueue] = useState(false)
+  const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>('all')
   const [, setSkippedIds] = useState<Set<number>>(new Set())
 
-  const pendingReviews = useMemo(
+  const pendingReviewItems = useMemo(
     () =>
       detections
         .filter(isPendingManualReview)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        .map((detection) => ({
+          detection,
+          reasons: getReviewReasons(detection),
+          score: getReviewScore(detection)
+        }))
+        .sort((a, b) => b.score - a.score || new Date(b.detection.createdAt).getTime() - new Date(a.detection.createdAt).getTime()),
     [detections]
   )
+  const reviewStats = useMemo(() => ({
+    broad: pendingReviewItems.filter((item) => item.reasons.includes('Etiqueta amplia')).length,
+    lowConfidence: pendingReviewItems.filter((item) => item.reasons.includes('Baja confianza')).length,
+    priority: pendingReviewItems.filter((item) => item.reasons.includes('Alta prioridad')).length,
+    total: pendingReviewItems.length
+  }), [pendingReviewItems])
+  const pendingReviewItemsForFilter = useMemo(() => pendingReviewItems.filter((item) => {
+    if (queueFilter === 'broad') return item.reasons.includes('Etiqueta amplia')
+    if (queueFilter === 'lowConfidence') return item.reasons.includes('Baja confianza')
+    if (queueFilter === 'priority') return item.reasons.includes('Alta prioridad')
+    return true
+  }), [pendingReviewItems, queueFilter])
+  const pendingReviews = useMemo(() => pendingReviewItemsForFilter.map((item) => item.detection), [pendingReviewItemsForFilter])
   const activeReview = pendingReviews[activeIndex] ?? pendingReviews[0] ?? null
   const reviewedCount = Math.max(0, detections.filter((detection) => !isPendingManualReview(detection) && (detection.manualReviewedAt || detection.manualReviewStatus)).length)
-  const totalReviewLike = reviewedCount + pendingReviews.length
+  const totalReviewLike = reviewedCount + pendingReviewItems.length
   const progressValue = totalReviewLike > 0 ? Math.round((reviewedCount / totalReviewLike) * 100) : 100
 
   const autocompleteOptions = useMemo(() => {
@@ -364,10 +465,12 @@ export default function ManualReviewsPanel({
         group: getTaxonomicGroup(detection.species),
         rawLabel: detection.species
       }))
-    const unique = new Map<string, { label: string; value: string; group: TaxonomicGroup; rawLabel?: string }>()
+    const unique = new Map<string, SpeciesOption>()
     ;[...speciesSuggestions, ...fromDetections].forEach((option) => unique.set(normalizeTaxonomyKey(option.value), option))
     return [...unique.values()].sort((a, b) => a.label.localeCompare(b.label, language === 'es' ? 'es' : 'en'))
   }, [detections, language])
+  const activeReviewReasons = activeReview ? getReviewReasons(activeReview) : []
+  const activeQuickSuggestions = activeReview ? getQuickSuggestions(activeReview, autocompleteOptions) : []
 
   const currentSpecies = activeReview
     ? speciesByDetection[activeReview.id] ?? (activeReview.species === 'Sin deteccion' ? '' : activeReview.species)
@@ -380,6 +483,16 @@ export default function ManualReviewsPanel({
       setActiveIndex(Math.max(0, pendingReviews.length - 1))
     }
   }, [activeIndex, pendingReviews.length])
+
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [queueFilter])
+
+  useEffect(() => {
+    if (queueFilter !== 'all' && pendingReviewItemsForFilter.length === 0) {
+      setQueueFilter('all')
+    }
+  }, [pendingReviewItemsForFilter.length, queueFilter])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -532,15 +645,34 @@ export default function ManualReviewsPanel({
           <h2>Revisiones manuales</h2>
         </div>
         <div className="manualReviewHeaderMeta">
-          <strong>Pendientes: {pendingReviews.length}</strong>
+          <strong>Pendientes: {reviewStats.total}</strong>
           <span>{activeIndex + 1} de {pendingReviews.length}</span>
         </div>
       </header>
 
+      <div className="smartReviewSummary" aria-label="Resumen de revisiones inteligentes">
+        <button className={queueFilter === 'all' ? 'active' : ''} onClick={() => setQueueFilter('all')} type="button">
+          <strong>{reviewStats.total}</strong>
+          <span>Todas</span>
+        </button>
+        <button className={queueFilter === 'broad' ? 'active' : ''} disabled={reviewStats.broad === 0} onClick={() => setQueueFilter('broad')} type="button">
+          <strong>{reviewStats.broad}</strong>
+          <span>Amplias</span>
+        </button>
+        <button className={queueFilter === 'lowConfidence' ? 'active' : ''} disabled={reviewStats.lowConfidence === 0} onClick={() => setQueueFilter('lowConfidence')} type="button">
+          <strong>{reviewStats.lowConfidence}</strong>
+          <span>Baja confianza</span>
+        </button>
+        <button className={queueFilter === 'priority' ? 'active' : ''} disabled={reviewStats.priority === 0} onClick={() => setQueueFilter('priority')} type="button">
+          <strong>{reviewStats.priority}</strong>
+          <span>Prioridad alta</span>
+        </button>
+      </div>
+
       <div className="manualReviewNavBar">
         <button className="secondaryButton" disabled={activeIndex === 0} onClick={goPrevious} type="button"><ChevronLeft size={16} /> Anterior</button>
         <div className="reviewProgressInline">
-          <span>{reviewedCount} revisada{reviewedCount === 1 ? '' : 's'} de {totalReviewLike || pendingReviews.length}</span>
+          <span>{reviewedCount} revisada{reviewedCount === 1 ? '' : 's'} de {totalReviewLike || reviewStats.total}</span>
           <div><i style={{ width: `${progressValue}%` }} /></div>
         </div>
         <button className="secondaryButton" disabled={activeIndex >= pendingReviews.length - 1} onClick={goNext} type="button">Siguiente <ChevronRight size={16} /></button>
@@ -552,10 +684,14 @@ export default function ManualReviewsPanel({
 
       {showQueue ? (
         <aside className="manualReviewQueue" aria-label="Lista de revisiones pendientes">
-          {pendingReviews.map((detection, index) => (
+          {pendingReviewItemsForFilter.map(({ detection, reasons }, index) => (
             <button className={index === activeIndex ? 'active' : ''} key={detection.id} onClick={() => { setActiveIndex(index); setShowQueue(false) }} type="button">
               <img alt={getSpeciesLabel(detection.species, language)} src={detection.imagePath} />
-              <span><strong>{getSpeciesLabel(detection.species, language)}</strong><small>{detection.camera?.code ?? detection.location} | {formatDateOnly(detection.capturedAt, language)}</small></span>
+              <span>
+                <strong>{getSpeciesLabel(detection.species, language)}</strong>
+                <small>{detection.camera?.code ?? detection.location} | {formatDateOnly(detection.capturedAt, language)}</small>
+                <i>{reasons.slice(0, 2).join(' | ')}</i>
+              </span>
               <em>{formatConfidence(detection.confidence)}</em>
             </button>
           ))}
@@ -573,7 +709,7 @@ export default function ManualReviewsPanel({
               <div><dt>Etiqueta original</dt><dd>{activeReview.species}</dd></div>
               <div><dt>Confianza</dt><dd>{formatConfidence(activeReview.confidence)}</dd></div>
               <div><dt>Prioridad</dt><dd>{activeReview.priority}</dd></div>
-              <div><dt>Motivo</dt><dd>{activeReview.species === 'Sin deteccion' ? 'Sin clasificacion confiable' : activeReview.confidence <= 70 ? 'Confianza baja' : 'Validacion requerida'}</dd></div>
+              <div><dt>Motivo</dt><dd>{activeReviewReasons.join(', ')}</dd></div>
               <div><dt>Bounding box</dt><dd>{hasBox ? 'Disponible' : 'No disponible'}</dd></div>
             </dl>
           </section>
@@ -606,6 +742,26 @@ export default function ManualReviewsPanel({
               options={autocompleteOptions}
               species={currentSpecies}
             />
+            {activeQuickSuggestions.length > 0 ? (
+              <div className="quickSpeciesSuggestions" aria-label="Sugerencias rapidas de especie">
+                <span>Sugerencias rapidas</span>
+                <div>
+                  {activeQuickSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion.value}
+                      onClick={() => {
+                        updateSpecies(activeReview.id, suggestion.value)
+                        updateGroup(activeReview.id, suggestion.group)
+                      }}
+                      type="button"
+                    >
+                      <strong>{suggestion.label}</strong>
+                      <small>{suggestion.value}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <label className="reviewNote compactReviewNote">
               <span>Observaciones</span>
               <textarea

@@ -18,6 +18,19 @@ export const invalidSpeciesValues = [
   '',
 ]
 
+const broadSpeciesPatterns = [
+  /\banimal\b/i,
+  /\bmammal\b/i,
+  /\bbird\b/i,
+  /\brodent\b/i,
+  /\breptile\b/i,
+  /\bamphibian\b/i,
+  /\bfish\b/i,
+  /\binsect\b/i,
+  /\bfamily\b/i,
+  /\bspecies\b/i
+]
+
 const excludedPositiveSpecies = new Set([
   '',
   'sin deteccion',
@@ -49,6 +62,11 @@ export function isValidSpecies(species: string | null | undefined) {
   return Boolean(normalized && !excludedPositiveSpecies.has(normalized))
 }
 
+export function isBroadSpeciesLabel(species: string | null | undefined) {
+  const value = species?.trim()
+  return Boolean(value && broadSpeciesPatterns.some((pattern) => pattern.test(value)))
+}
+
 export function isPositiveFaunaDetection(species: string | null | undefined, confidence = 0) {
   return isValidSpecies(species) && confidence > 0
 }
@@ -72,7 +90,7 @@ export function isValidDistinctSpecies(species: string | null | undefined, confi
 
 export function shouldRequireManualReview(detection: DetectionClassificationInput) {
   const priority = detection.priority ?? ''
-  return priority === 'Revision manual' || !isPositiveDetection(detection)
+  return priority === 'Revision manual' || !isPositiveDetection(detection) || isBroadSpeciesLabel(detection.species)
 }
 
 export function getConfidenceBucket(confidence: number) {

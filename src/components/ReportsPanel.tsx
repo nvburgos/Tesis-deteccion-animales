@@ -13,6 +13,7 @@ import {
   Filter,
   ImageDown,
   LineChart as LineChartIcon,
+  DatabaseZap,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -264,6 +265,16 @@ function exportPng(report: ReportsResponse | null) {
   }, 'image/png')
 }
 
+async function exportCuratedDatasetCsv(filters: ReportFilters) {
+  const response = await fetch(`/api/datasets/curated?${buildQuery({ ...filters, reviewStatus: 'reviewed' })}`, { cache: 'no-store' })
+
+  if (!response.ok) {
+    throw new Error('No fue posible exportar el dataset curado.')
+  }
+
+  downloadBlob(await response.blob(), 'dataset-curado-wildlifeai.csv', 'text/csv;charset=utf-8')
+}
+
 function MultiSelect({ label, options, placeholder, selected, onChange }: { label: string; options: Array<{ label: string; value: string }>; placeholder: string; selected: string[]; onChange: (value: string[]) => void }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -450,6 +461,7 @@ export default function ReportsPanel({ language, seedDetections }: { language: L
           <button className="secondaryButton" onClick={() => window.print()} type="button"><FileText size={16} />PDF</button>
           <button className="secondaryButton" onClick={() => exportExcel(rows)} type="button"><FileSpreadsheet size={16} />Excel</button>
           <button className="secondaryButton" onClick={() => exportCsv(rows)} type="button"><FileDown size={16} />CSV</button>
+          <button className="secondaryButton" onClick={() => { setExportError(''); exportCuratedDatasetCsv(filters).catch((datasetError: unknown) => setExportError(datasetError instanceof Error ? datasetError.message : 'No fue posible exportar el dataset curado.')) }} type="button"><DatabaseZap size={16} />Dataset curado</button>
           <button className="secondaryButton" onClick={() => { try { setExportError(''); exportPng(report) } catch { setExportError('No fue posible exportar el PNG.') } }} type="button"><ImageDown size={16} />PNG</button>
           <button className="secondaryButton" onClick={() => downloadBlob(JSON.stringify(report, null, 2), 'reporte-wildlifeai.json', 'application/json;charset=utf-8')} type="button"><FileJson size={16} />JSON</button>
         </div>

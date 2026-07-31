@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BarChart3, Camera, ChevronLeft, ChevronRight, Eye, PawPrint, Search, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, BarChart3, Camera, CheckCircle2, ChevronLeft, ChevronRight, Eye, HelpCircle, PawPrint, Pencil, Search, SlidersHorizontal, Users, XCircle } from 'lucide-react'
 import type { UiText } from '@/lib/i18n'
 import type { CameraSummary, Language, RecentDetection } from './dashboardTypes'
 
@@ -48,6 +48,18 @@ type SpeciesDetailResponse = {
   }
   rangeActivity: Array<{ range: string; count: number }>
   dailyActivity: Array<{ date: string; count: number }>
+  individuals: Array<{
+    averageConfidence: number
+    detectionCount: number
+    firstDetectedAt: string | null
+    id: number | null
+    label: string
+    lastDetectedAt: string | null
+    matchStatus: string
+    representativeDetectionId: number
+    representativeImagePath: string
+    species: string
+  }>
   activityConclusion: string
   detections: RecentDetection[]
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
@@ -56,6 +68,9 @@ type SpeciesDetailResponse = {
 }
 
 type SortMode = 'records' | 'recent' | 'confidence' | 'alphabetical'
+type IndividualSummary = SpeciesDetailResponse['individuals'][number]
+type ComparisonPair = { reference: IndividualSummary; candidate: IndividualSummary }
+type ComparisonInsight = { sameCamera: boolean; sameSpecies: boolean; timeGapHours: number; visualSimilarity: number | null }
 
 const groups = ['Mamifero', 'Ave', 'Reptil', 'Anfibio', 'Insecto', 'Otro', 'Sin clasificar']
 
@@ -103,8 +118,15 @@ export default function SpeciesGallery({
   const [isDetailMode, setIsDetailMode] = useState(false)
   const [detail, setDetail] = useState<SpeciesDetailResponse | null>(null)
   const [detailPage, setDetailPage] = useState(1)
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [individualNames, setIndividualNames] = useState<Record<number, string>>({})
+  const [savingIndividualId, setSavingIndividualId] = useState<number | null>(null)
+  const [comparisonPair, setComparisonPair] = useState<ComparisonPair | null>(null)
+  const [comparisonInsight, setComparisonInsight] = useState<ComparisonInsight | null>(null)
+  const [isComparisonLoading, setIsComparisonLoading] = useState(false)
+  const [savingDecision, setSavingDecision] = useState('')
   const [error, setError] = useState('')
   const [limitation, setLimitation] = useState('')
 
@@ -191,7 +213,16 @@ export default function SpeciesGallery({
     setIsDetailLoading(true)
     fetch(`/api/cameras/${camera.id}/species/${selectedSpeciesKey}?${params.toString()}`, { cache: 'no-store', signal: controller.signal })
       .then((response) => readJson<SpeciesDetailResponse>(response))
-      .then(setDetail)
+      .then((data) => {
+        setDetail(data)
+        setIndividualNames((current) => {
+          const next = { ...current }
+          data.individuals.forEach((individual) => {
+            if (individual.id && next[individual.id] === undefined) next[individual.id] = individual.label
+          })
+          return next
+        })
+      })
       .catch((loadError: unknown) => {
         if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el detalle de especie')
       })
@@ -200,7 +231,7 @@ export default function SpeciesGallery({
       })
 
     return () => controller.abort()
-  }, [camera, detailPage, isDetailMode, selectedSpeciesKey])
+  }, [camera, detailPage, detailRefreshKey, isDetailMode, selectedSpeciesKey])
 
   function updatePage(page: number) {
     setPagination((current) => ({ ...current, page }))
@@ -215,6 +246,80 @@ export default function SpeciesGallery({
 
   function returnToList() {
     setIsDetailMode(false)
+    setComparisonPair(null)
+    setComparisonInsight(null)
+  }
+
+  function startComparison(reference: IndividualSummary) {
+    if (!detail) return
+    const candidate = detail.individuals.find((individual) => individual.representativeDetectionId !== reference.representativeDetectionId)
+    if (!candidate) {
+      setError('Se necesita al menos otro individuo supuesto para comparar.')
+      return
+    }
+    setComparisonPair({ reference, candidate })
+    setComparisonInsight(null)
+    setIsComparisonLoading(true)
+    setError('')
+    const params = new URLSearchParams({
+      candidateDetectionId: String(candidate.representativeDetectionId),
+      referenceDetectionId: String(reference.representativeDetectionId)
+    })
+    fetch(`/api/individuals/review?${params.toString()}`, { cache: 'no-store' })
+      .then((response) => readJson<{ comparison: ComparisonInsight }>(response))
+      .then((data) => setComparisonInsight(data.comparison))
+      .catch((compareError: unknown) => setError(compareError instanceof Error ? compareError.message : 'No se pudo calcular la comparacion visual'))
+      .finally(() => setIsComparisonLoading(false))
+  }
+
+  async function renameIndividual(individual: IndividualSummary) {
+    if (!individual.id) return
+    const label = individualNames[individual.id]?.trim()
+    if (!label) {
+      setError('Escribe un nombre para el individuo.')
+      return
+    }
+
+    setSavingIndividualId(individual.id)
+    setError('')
+
+    try {
+      await readJson(await fetch(`/api/individuals/${individual.id}`, {
+        body: JSON.stringify({ label }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH'
+      }))
+      setDetailRefreshKey((current) => current + 1)
+    } catch (renameError: unknown) {
+      setError(renameError instanceof Error ? renameError.message : 'No se pudo guardar el nombre del individuo')
+    } finally {
+      setSavingIndividualId(null)
+    }
+  }
+
+  async function decideComparison(decision: 'same' | 'different' | 'unsure') {
+    if (!comparisonPair) return
+    setSavingDecision(decision)
+    setError('')
+
+    try {
+      await readJson(await fetch('/api/individuals/review', {
+        body: JSON.stringify({
+          candidateDetectionId: comparisonPair.candidate.representativeDetectionId,
+          decision,
+          referenceDetectionId: comparisonPair.reference.representativeDetectionId
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST'
+      }))
+      setComparisonPair(null)
+      setComparisonInsight(null)
+      setDetailRefreshKey((current) => current + 1)
+    } catch (decisionError: unknown) {
+      setError(decisionError instanceof Error ? decisionError.message : 'No se pudo guardar la decision')
+    } finally {
+      setSavingDecision('')
+    }
   }
 
   const maxRangeCount = useMemo(() => Math.max(1, ...(detail?.rangeActivity.map((item) => item.count) ?? [0])), [detail])
@@ -260,6 +365,66 @@ export default function SpeciesGallery({
               <article><span>Horario de captura</span><strong>{detail.species.peakActivityRange}</strong></article>
               <article><span>Revisiones pendientes</span><strong>{detail.species.pendingReviews.toLocaleString('es-ES')}</strong></article>
             </div>
+
+            <section className="speciesIndividualsPanel">
+              <div className="speciesEvidenceHeader">
+                <strong><Users size={17} /> Individuos supuestos</strong>
+                <span>{detail.individuals.length} grupo{detail.individuals.length === 1 ? '' : 's'}</span>
+              </div>
+              {comparisonPair ? (
+                <div className="individualComparePanel">
+                  <div className="individualCompareImages">
+                    <article>
+                      <img alt={comparisonPair.reference.label} src={comparisonPair.reference.representativeImagePath} />
+                      <strong>{comparisonPair.reference.label}</strong>
+                      <span>{comparisonPair.reference.detectionCount} registro{comparisonPair.reference.detectionCount === 1 ? '' : 's'}</span>
+                    </article>
+                    <article>
+                      <img alt={comparisonPair.candidate.label} src={comparisonPair.candidate.representativeImagePath} />
+                      <strong>{comparisonPair.candidate.label}</strong>
+                      <span>{comparisonPair.candidate.detectionCount} registro{comparisonPair.candidate.detectionCount === 1 ? '' : 's'}</span>
+                    </article>
+                  </div>
+                  <div className="individualCompareInsight">
+                    <span>Visual: {isComparisonLoading ? 'calculando...' : comparisonInsight?.visualSimilarity !== null && comparisonInsight?.visualSimilarity !== undefined ? `${comparisonInsight.visualSimilarity}%` : 'sin recorte'}</span>
+                    <span>Tiempo: {comparisonInsight ? `${comparisonInsight.timeGapHours} h` : '...'}</span>
+                    <span>{comparisonInsight?.sameCamera ? 'Misma camara' : 'Camaras distintas'}</span>
+                  </div>
+                  <div className="individualCompareActions">
+                    <button className="primaryButton" disabled={Boolean(savingDecision)} onClick={() => decideComparison('same')} type="button"><CheckCircle2 size={16} /> {savingDecision === 'same' ? 'Guardando...' : 'Mismo individuo'}</button>
+                    <button className="secondaryButton" disabled={Boolean(savingDecision)} onClick={() => decideComparison('different')} type="button"><XCircle size={16} /> Distinto</button>
+                    <button className="secondaryButton" disabled={Boolean(savingDecision)} onClick={() => decideComparison('unsure')} type="button"><HelpCircle size={16} /> Inseguro</button>
+                    <button className="ghostTableAction" disabled={Boolean(savingDecision)} onClick={() => { setComparisonPair(null); setComparisonInsight(null) }} type="button">Cancelar</button>
+                  </div>
+                </div>
+              ) : null}
+              <div className="speciesIndividualsGrid">
+                {detail.individuals.map((individual) => (
+                  <article key={`${individual.id ?? 'none'}-${individual.representativeDetectionId}`}>
+                    <img alt={individual.label} src={individual.representativeImagePath} />
+                    <div>
+                      {individual.id ? (
+                        <label>
+                          <span>Nombre</span>
+                          <input
+                            onChange={(event) => setIndividualNames((current) => ({ ...current, [individual.id as number]: event.target.value }))}
+                            value={individualNames[individual.id] ?? individual.label}
+                          />
+                        </label>
+                      ) : (
+                        <strong>{individual.label}</strong>
+                      )}
+                      <small>{individual.detectionCount} registro{individual.detectionCount === 1 ? '' : 's'} | {individual.matchStatus}</small>
+                      <small>{formatDate(individual.firstDetectedAt)} - {formatDate(individual.lastDetectedAt)}</small>
+                      <div className="individualCardActions">
+                        {individual.id ? <button className="secondaryButton" disabled={savingIndividualId === individual.id} onClick={() => renameIndividual(individual)} type="button"><Pencil size={15} /> {savingIndividualId === individual.id ? 'Guardando...' : 'Guardar nombre'}</button> : null}
+                        <button className="secondaryButton" onClick={() => startComparison(individual)} type="button"><Eye size={15} /> Comparar</button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
 
             <div className="speciesChartsGrid">
               <section className="speciesChartCard">

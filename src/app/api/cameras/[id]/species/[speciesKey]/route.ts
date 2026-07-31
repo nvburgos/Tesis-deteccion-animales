@@ -133,6 +133,70 @@ function toDateKey(value: Date) {
   return value.toISOString().slice(0, 10)
 }
 
+function buildIndividualSummaries(detections: Array<{
+  capturedAt?: Date | null
+  confidence: number
+  createdAt: Date
+  id: number
+  imagePath: string
+  individualId: number | null
+  individualMatchConfidence: number | null
+  individualMatchStatus: string | null
+  individual?: { id: number; species: string; label: string | null } | null
+}>) {
+  const summaries = new Map<string, {
+    averageConfidence: number
+    confidenceTotal: number
+    detectionCount: number
+    firstDetectedAt: string | null
+    id: number | null
+    label: string
+    lastDetectedAt: string | null
+    matchStatus: string
+    representativeDetectionId: number
+    representativeImagePath: string
+    species: string
+  }>()
+
+  detections.forEach((detection) => {
+    const key = detection.individualId ? String(detection.individualId) : 'unassigned'
+    const capturedAt = detection.capturedAt ?? detection.createdAt
+    const current = summaries.get(key)
+
+    if (!current) {
+      summaries.set(key, {
+        averageConfidence: detection.confidence,
+        confidenceTotal: detection.confidence,
+        detectionCount: 1,
+        firstDetectedAt: capturedAt.toISOString(),
+        id: detection.individualId,
+        label: detection.individual?.label ?? (detection.individualId ? `Individuo #${detection.individualId}` : 'Sin individuo asignado'),
+        lastDetectedAt: capturedAt.toISOString(),
+        matchStatus: detection.individualMatchStatus ?? 'Sin confirmar',
+        representativeDetectionId: detection.id,
+        representativeImagePath: toProtectedDetectionImagePath(detection.id),
+        species: detection.individual?.species ?? ''
+      })
+      return
+    }
+
+    current.detectionCount += 1
+    current.confidenceTotal += detection.confidence
+    current.averageConfidence = current.confidenceTotal / current.detectionCount
+    if (!current.firstDetectedAt || capturedAt < new Date(current.firstDetectedAt)) current.firstDetectedAt = capturedAt.toISOString()
+    if (!current.lastDetectedAt || capturedAt > new Date(current.lastDetectedAt)) {
+      current.lastDetectedAt = capturedAt.toISOString()
+      current.representativeDetectionId = detection.id
+      current.representativeImagePath = toProtectedDetectionImagePath(detection.id)
+    }
+    if (detection.individualMatchStatus === 'Probable reencuentro') current.matchStatus = detection.individualMatchStatus
+  })
+
+  return [...summaries.values()]
+    .map(({ confidenceTotal, ...summary }) => summary)
+    .sort((left, right) => right.detectionCount - left.detectionCount || Number(left.id ?? 0) - Number(right.id ?? 0))
+}
+
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string; speciesKey: string }> }) {
   try {
     const currentUser = await getCurrentUser()
@@ -171,11 +235,27 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       where.userId = currentUser.id
     }
 
-    const [total, allRecords, detections] = await Promise.all([
+    const [total, allRecords, individualRecords, detections] = await Promise.all([
       prisma.detection.count({ where }),
       prisma.detection.findMany({
         orderBy: hasCaptureColumns ? [{ capturedAt: 'asc' }, { createdAt: 'asc' }] : { createdAt: 'asc' },
         select: { confidence: true, createdAt: true, manualReviewedAt: true, ...(hasCaptureColumns ? { capturedAt: true } : {}) },
+        where
+      }),
+      prisma.detection.findMany({
+        orderBy: hasCaptureColumns ? [{ capturedAt: 'asc' }, { createdAt: 'asc' }] : { createdAt: 'asc' },
+        select: {
+          confidence: true,
+          createdAt: true,
+          id: true,
+          imagePath: true,
+          individualId: true,
+          individualMatchConfidence: true,
+          individualMatchStatus: true,
+          ...(hasCaptureColumns ? { capturedAt: true } : {}),
+          individual: { select: { id: true, label: true, species: true } }
+        },
+        take: 500,
         where
       }),
       prisma.detection.findMany({
@@ -259,6 +339,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       hourlyActivity,
       rangeActivity,
       dailyActivity,
+      individuals: buildIndividualSummaries(individualRecords),
       activityConclusion: peakActivityRange === 'Sin datos' ? 'No hay fechas de captura suficientes para esta especie.' : `Esta especie presento mayor actividad entre las ${peakActivityRange}.`,
       detections: detections.map(toPublicDetection),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },

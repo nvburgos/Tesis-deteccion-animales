@@ -5698,6 +5698,164 @@ tbody tr:hover {
   padding: 0 4px;
 }
 
+.speciesIndividualsPanel {
+  background: #ffffff;
+  border: 1px solid #dfe8e2;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.speciesEvidenceHeader strong {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.speciesIndividualsGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px;
+}
+
+.speciesIndividualsGrid article {
+  background: #f8faf9;
+  border: 1px solid #e1e7e3;
+  border-radius: 12px;
+  display: grid;
+  overflow: hidden;
+}
+
+.speciesIndividualsGrid img {
+  aspect-ratio: 4 / 3;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.speciesIndividualsGrid article > div {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+}
+
+.speciesIndividualsGrid label {
+  display: grid;
+  gap: 5px;
+}
+
+.speciesIndividualsGrid label span {
+  color: #65716c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speciesIndividualsGrid input {
+  background: #fff;
+  border: 1px solid #d7e3dc;
+  border-radius: 10px;
+  color: #17231d;
+  font: inherit;
+  font-weight: 800;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.speciesIndividualsGrid strong {
+  color: #17231d;
+  font-size: 15px;
+}
+
+.speciesIndividualsGrid small {
+  color: #64716b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.individualCardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.individualCardActions .secondaryButton {
+  font-size: 0.78rem;
+  min-height: 34px;
+  padding: 7px 9px;
+}
+
+.individualComparePanel {
+  border-bottom: 1px solid #e1e7e3;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.individualCompareImages {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.individualCompareImages article {
+  background: #f8faf9;
+  border: 1px solid #dfe8e2;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.individualCompareImages img {
+  aspect-ratio: 16 / 10;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.individualCompareImages strong,
+.individualCompareImages span {
+  display: block;
+  padding: 0 11px;
+}
+
+.individualCompareImages strong {
+  color: #17231d;
+  font-size: 15px;
+  padding-top: 10px;
+}
+
+.individualCompareImages span {
+  color: #64716b;
+  font-size: 12px;
+  padding-bottom: 11px;
+  padding-top: 3px;
+}
+
+.individualCompareActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.individualCompareInsight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.individualCompareInsight span {
+  background: #eef6f2;
+  border: 1px solid #d4e7dd;
+  border-radius: 999px;
+  color: var(--forest-900);
+  font-size: 0.77rem;
+  font-weight: 850;
+  padding: 7px 10px;
+}
+
 .speciesEvidenceFullPanel {
   background: #ffffff;
   border: 1px solid #dfe8e2;
@@ -5762,6 +5920,10 @@ tbody tr:hover {
   .speciesEvidenceFullGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .speciesIndividualsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -5782,6 +5944,11 @@ tbody tr:hover {
   .speciesEvidenceFullGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .individualCompareImages,
+  .speciesIndividualsGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -5795,6 +5962,7 @@ tbody tr:hover {
   }
 
   .speciesFullMetrics,
+  .speciesIndividualsGrid,
   .speciesEvidenceFullGrid {
     grid-template-columns: 1fr;
   }
@@ -5848,6 +6016,50 @@ tbody tr:hover {
 .manualReviewHeaderMeta strong {
   color: var(--forest-900);
   font-size: 0.98rem;
+}
+
+.smartReviewSummary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.smartReviewSummary button {
+  background: #fff;
+  border: 1px solid #dfe8e3;
+  border-radius: 10px;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.smartReviewSummary button:hover,
+.smartReviewSummary button.active {
+  border-color: #8ccdaf;
+  box-shadow: 0 10px 24px rgba(31, 91, 63, 0.1);
+  transform: translateY(-1px);
+}
+
+.smartReviewSummary button:disabled {
+  cursor: default;
+  opacity: 0.48;
+  transform: none;
+}
+
+.smartReviewSummary strong {
+  color: var(--forest-900);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.smartReviewSummary span {
+  color: var(--muted-700);
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .manualReviewNavBar {
@@ -6115,6 +6327,58 @@ tbody tr:hover {
   padding: 7px 9px;
 }
 
+.quickSpeciesSuggestions {
+  display: grid;
+  gap: 7px;
+}
+
+.quickSpeciesSuggestions > span {
+  color: var(--muted-700);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.quickSpeciesSuggestions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.quickSpeciesSuggestions button {
+  background: #f4faf7;
+  border: 1px solid #cfe5da;
+  border-radius: 10px;
+  color: var(--forest-900);
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+  max-width: 180px;
+  min-width: 0;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.quickSpeciesSuggestions button:hover {
+  background: #eaf7f0;
+  border-color: #95ceb3;
+}
+
+.quickSpeciesSuggestions strong,
+.quickSpeciesSuggestions small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickSpeciesSuggestions strong {
+  font-size: 0.78rem;
+}
+
+.quickSpeciesSuggestions small {
+  color: var(--muted-600);
+  font-size: 0.68rem;
+}
+
 .speciesAutocomplete {
   display: grid;
   gap: 8px;
@@ -6321,6 +6585,16 @@ tbody tr:hover {
   font-size: 0.74rem;
 }
 
+.manualReviewQueue i {
+  color: #806115;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .manualReviewQueue em {
   color: var(--forest-800);
   font-size: 0.8rem;
@@ -6362,6 +6636,10 @@ tbody tr:hover {
 
   .manualReviewNavBar {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .smartReviewSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .reviewProgressInline {
