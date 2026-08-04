@@ -1,15 +1,29 @@
 import argparse
 import json
 import os
+import re
 import sys
 import time
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
+import yaml
 
 from capture_datetime import extract_capture_metadata
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+DATASET_YAML = Path.cwd() / "python" / "dataset" / "data.yaml"
+BROAD_LABEL_PATTERNS = [
+    re.compile(r"\banimal\b", re.IGNORECASE),
+    re.compile(r"\bmammal\b", re.IGNORECASE),
+    re.compile(r"\bbird\b", re.IGNORECASE),
+    re.compile(r"\breptile\b", re.IGNORECASE),
+    re.compile(r"\bamphibian\b", re.IGNORECASE),
+    re.compile(r"\bfamily\b", re.IGNORECASE),
+    re.compile(r"\bgenus\b", re.IGNORECASE),
+    re.compile(r"\bspecies\b", re.IGNORECASE),
+]
 MEGADETECTOR_LABELS = {
     "1": "animal",
     "2": "person",
@@ -32,6 +46,87 @@ def get_device():
         return "GPU" if torch.cuda.is_available() else "CPU"
     except Exception:
         return "CPU"
+
+
+def normalize_label(label):
+    return str(label).replace("_", " ").replace("-", " ").strip().lower()
+
+
+def env_flag(name, default=True):
+    value = os.environ.get(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def env_float(name, default):
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def get_model_path():
+    model_path = os.environ.get("YOLO_MODEL_PATH")
+
+    if not model_path:
+        local_best = Path.cwd() / "python" / "best.pt"
+        model_path = "python/best.pt" if local_best.exists() else "yolov8n.pt"
+
+    model_path = Path(model_path)
+    if not model_path.is_absolute():
+        model_path = Path.cwd() / model_path
+
+    return model_path
+
+
+@lru_cache(maxsize=1)
+def load_trained_label_map():
+    if not DATASET_YAML.exists():
+        return {}
+
+    try:
+        with DATASET_YAML.open("r", encoding="utf-8") as file:
+            data = yaml.safe_load(file) or {}
+    except Exception:
+        return {}
+
+    names = data.get("names") or {}
+    if isinstance(names, dict):
+        values = [names[index] for index in sorted(names)]
+    else:
+        values = names
+
+    return {normalize_label(name): str(name).replace("_", " ").strip() for name in values}
+
+
+def has_curated_yolo_model():
+    local_best = Path.cwd() / "python" / "best.pt"
+    explicit_model = os.environ.get("YOLO_MODEL_PATH")
+    is_generic_yolo = explicit_model and Path(explicit_model).name.lower() in {"yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"}
+    is_curated_model = local_best.exists() or bool(explicit_model and not is_generic_yolo)
+    return bool(load_trained_label_map()) and is_curated_model and get_model_path().exists()
+
+
+def is_configured_species(label):
+    return normalize_label(label) in load_trained_label_map()
+
+
+def to_display_species(label):
+    return load_trained_label_map().get(normalize_label(label))
+
+
+def is_broad_or_uncertain_species(species):
+    if not species:
+        return True
+
+    normalized = normalize_label(species)
+    if normalized in {"sin deteccion", "sin detección", "unknown", "no cv result", "no detection"}:
+        return True
+
+    return any(pattern.search(str(species)) for pattern in BROAD_LABEL_PATTERNS)
 
 
 def list_images(folder):
@@ -143,6 +238,110 @@ def prediction_to_result(image_path, prediction):
     }
 
 
+@lru_cache(maxsize=2)
+def load_yolo_model(model_path):
+    from ultralytics import YOLO
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"YOLO model not found at {model_path}")
+
+    return YOLO(str(model_path))
+
+
+def classify_species_with_yolo(image_path):
+    model_path = get_model_path()
+    model = load_yolo_model(model_path)
+    results = model(image_path, verbose=False)
+
+    if not results or len(results[0].boxes) == 0:
+        return {
+            "species": "Sin deteccion",
+            "confidence": 0,
+            "coordinates": None,
+            "model": model_path.name,
+        }
+
+    boxes = results[0].boxes
+    best_index = int(boxes.conf.argmax().item())
+    class_id = int(boxes.cls[best_index].item())
+    raw_label = results[0].names[class_id]
+
+    if not is_configured_species(raw_label):
+        return {
+            "species": "Sin deteccion",
+            "confidence": 0,
+            "coordinates": None,
+            "rawLabel": raw_label,
+            "model": model_path.name,
+            "warning": f"Unsupported YOLO label '{raw_label}'.",
+        }
+
+    return {
+        "species": to_display_species(raw_label),
+        "confidence": round(float(boxes.conf[best_index].item()) * 100, 2),
+        "coordinates": [round(float(value), 2) for value in boxes.xyxy[best_index].tolist()],
+        "rawLabel": raw_label,
+        "model": model_path.name,
+    }
+
+
+def should_try_curated_yolo(result):
+    if not env_flag("CURATED_MODEL_ENABLED", True):
+        return False
+
+    if not has_curated_yolo_model():
+        return False
+
+    if not result.get("animalDetected"):
+        return False
+
+    confidence = float(result.get("confidence") or 0)
+    low_confidence_threshold = env_float("SPECIESNET_LOW_CONFIDENCE_THRESHOLD", 60)
+
+    return is_broad_or_uncertain_species(result.get("species")) or confidence < low_confidence_threshold
+
+
+def apply_curated_yolo_if_needed(image_path, speciesnet_result):
+    if not should_try_curated_yolo(speciesnet_result):
+        return speciesnet_result
+
+    threshold = env_float("CURATED_MODEL_CONFIDENCE_THRESHOLD", 55)
+
+    try:
+        curated_result = classify_species_with_yolo(image_path)
+    except Exception as error:
+        speciesnet_result["curatedModelError"] = str(error)
+        return speciesnet_result
+
+    curated_confidence = float(curated_result.get("confidence") or 0)
+    speciesnet_result["speciesnetSpecies"] = speciesnet_result.get("species")
+    speciesnet_result["speciesnetConfidence"] = speciesnet_result.get("confidence")
+    speciesnet_result["curatedModelSpecies"] = curated_result.get("species")
+    speciesnet_result["curatedModelConfidence"] = curated_confidence
+    speciesnet_result["curatedModel"] = curated_result.get("model")
+
+    if curated_result.get("species") != "Sin deteccion" and curated_confidence >= threshold:
+        return {
+            **speciesnet_result,
+            "species": curated_result["species"],
+            "confidence": curated_confidence,
+            "coordinates": curated_result.get("coordinates") or speciesnet_result.get("coordinates"),
+            "detector": "SpeciesNet + YOLO curado",
+            "model": curated_result.get("model"),
+            "rawLabel": curated_result.get("rawLabel"),
+            "message": (
+                f"SpeciesNet devolvio una etiqueta amplia o dudosa; "
+                f"el modelo curado propuso {curated_result['species']}."
+            ),
+        }
+
+    speciesnet_result["message"] = (
+        speciesnet_result.get("message")
+        or "SpeciesNet detecto un animal, pero el modelo curado aun no tuvo confianza suficiente."
+    )
+    return speciesnet_result
+
+
 def load_predictions_json(path):
     if not path.exists():
         return {}
@@ -221,6 +420,8 @@ def run_prediction_microbatch(model, chunk, chunk_number, total_chunks, complete
             emit_missing_prediction(image_path, index, total)
             continue
 
+        result = prediction_to_result(image_path, prediction)
+        result = apply_curated_yolo_if_needed(image_path, result)
         emit({
             "type": "result",
             "index": index,
@@ -228,7 +429,7 @@ def run_prediction_microbatch(model, chunk, chunk_number, total_chunks, complete
             "imagePath": image_path,
             "microbatch": chunk_number,
             "microbatchSeconds": round(seconds, 3),
-            **prediction_to_result(image_path, prediction),
+            **result,
         })
 
     return seconds

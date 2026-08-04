@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { Eye, SlidersHorizontal, Search } from 'lucide-react'
+import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { getSpeciesLabel } from '@/lib/i18n'
 import { isPendingManualReview, normalizePriority, normalizeReviewStatus } from '@/lib/manualReviewPolicy'
@@ -164,7 +165,13 @@ export default function BatchDetectionsTable({
                   </td>
                   <td className="speciesCell">{getSpeciesLabel(detection.species, language)}</td>
                   <td>
-                    <strong>{getIndividualLabel(detection)}</strong>
+                    {detection.individualId ? (
+                      <Link className="tableInlineLink" href={`/individuals/${detection.individualId}`}>
+                        {getIndividualLabel(detection)}
+                      </Link>
+                    ) : (
+                      <strong>{getIndividualLabel(detection)}</strong>
+                    )}
                     {getMatchDetail(detection) ? <span className="tableSubtext">{getMatchDetail(detection)}</span> : null}
                   </td>
                   <td className="confidenceCell"><span>{Math.round(detection.confidence)}%</span></td>

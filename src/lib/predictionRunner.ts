@@ -11,7 +11,7 @@ import { getStorageRoot, toProtectedDetectionImagePath } from '@/lib/fileStorage
 import { assignIndividualMatch } from '@/lib/individualMatching'
 
 const execFileAsync = promisify(execFile)
-const defaultMaxImageDimension = 1280
+const defaultMaxImageDimension = 960
 
 export type PredictionResult = {
   species: string
@@ -40,8 +40,61 @@ export type DetectionOwner = {
   name: string
 }
 
+const nonRepeatableSpecies = new Set(['', 'imagen no evaluable', 'no cv result', 'sin deteccion', 'sin detección', 'unknown'])
+
 export function sanitizeFilename(filename: string) {
   return filename.replace(/[^a-zA-Z0-9.-]/g, '-').toLowerCase()
+}
+
+function normalizeSpeciesForRepeat(species: string) {
+  return species.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+function canCompareSameSpecies(species: string, confidence: number) {
+  return confidence > 0 && !nonRepeatableSpecies.has(normalizeSpeciesForRepeat(species))
+}
+
+async function getSameSpeciesSummary(detection: { id: number; species: string; confidence: number; userId: number | null }) {
+  if (!canCompareSameSpecies(detection.species, detection.confidence)) {
+    return {
+      previousSameSpeciesCount: 0,
+      sameSpeciesLastDetectedAt: null,
+      sameSpeciesLastLocation: null,
+      sameSpeciesStatus: 'Sin coincidencias de especie'
+    }
+  }
+
+  const where = {
+    confidence: { gt: 0 },
+    id: { not: detection.id },
+    species: detection.species,
+    ...(detection.userId ? { userId: detection.userId } : {})
+  }
+
+  const [previousSameSpeciesCount, previousDetection] = await Promise.all([
+    prisma.detection.count({ where }),
+    prisma.detection.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        camera: { select: { code: true, name: true, zone: true } },
+        capturedAt: true,
+        createdAt: true,
+        location: true
+      },
+      where
+    })
+  ])
+
+  const previousLocation = previousDetection?.camera
+    ? `${previousDetection.camera.name} (${previousDetection.camera.zone})`
+    : previousDetection?.location ?? null
+
+  return {
+    previousSameSpeciesCount,
+    sameSpeciesLastDetectedAt: (previousDetection?.capturedAt ?? previousDetection?.createdAt)?.toISOString() ?? null,
+    sameSpeciesLastLocation: previousLocation,
+    sameSpeciesStatus: previousSameSpeciesCount > 0 ? 'Especie detectada anteriormente' : 'Primera deteccion de esta especie'
+  }
 }
 
 function getDefaultModelPath() {
@@ -241,10 +294,18 @@ export async function createDetectionFromPrediction({
       visibleMetadataText: true
     }
   })
-  const individualMatch = await assignIndividualMatch(detection.id).catch((error) => {
-    console.error('No se pudo asignar reencuentro para la deteccion:', error)
-    return null
-  })
+  const [individualMatch, sameSpeciesSummary] = await Promise.all([
+    assignIndividualMatch(detection.id).catch((error) => {
+      console.error('No se pudo asignar reencuentro para la deteccion:', error)
+      return null
+    }),
+    getSameSpeciesSummary({
+      confidence: detection.confidence,
+      id: detection.id,
+      species: detection.species,
+      userId: owner.id
+    })
+  ])
 
   return {
     confidence: detection.confidence,
@@ -269,6 +330,10 @@ export async function createDetectionFromPrediction({
     individualMatchConfidence: individualMatch?.individualMatchConfidence ?? null,
     individualMatchBasis: individualMatch?.individualMatchBasis ?? null,
     individual: individualMatch?.individual ?? null,
+    previousSameSpeciesCount: sameSpeciesSummary.previousSameSpeciesCount,
+    sameSpeciesLastDetectedAt: sameSpeciesSummary.sameSpeciesLastDetectedAt,
+    sameSpeciesLastLocation: sameSpeciesSummary.sameSpeciesLastLocation,
+    sameSpeciesStatus: sameSpeciesSummary.sameSpeciesStatus,
     warning: prediction.warning
   }
 }

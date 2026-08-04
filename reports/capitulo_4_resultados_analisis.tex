@@ -1,0 +1,318 @@
+\chapter{}
+\begin{center}
+\textbf{RESULTADOS Y ANÁLISIS}
+\end{center}
+
+En el presente capítulo se presentan los resultados obtenidos durante el desarrollo, implementación y validación técnica de la plataforma \textit{WildlifeAI}. El análisis se organiza en función del desempeño del componente de inteligencia artificial, la implementación del prototipo web, la simulación de los procesos de carga y análisis de imágenes, la evaluación técnica del sistema, la discusión de resultados, el cumplimiento de los objetivos planteados y el análisis económico referencial de la solución.
+
+Los resultados corresponden a la versión funcional del sistema desarrollada para el procesamiento de imágenes provenientes de cámaras trampa. La plataforma integra una aplicación web construida con Next.js y React, una capa de servicios basada en rutas API, una base de datos PostgreSQL administrada mediante Prisma ORM, un sistema de almacenamiento privado para archivos y un módulo de inteligencia artificial implementado en Python con SpeciesNet como flujo principal de detección y clasificación.
+
+\section{Métricas de Desempeño IA}
+\label{sec:metricas_desempeno_ia}
+
+La evaluación del desempeño del componente de inteligencia artificial se realizó considerando las capacidades funcionales del flujo de inferencia, la cobertura taxonómica del modelo SpeciesNet respecto al catálogo local de especies de Ecuador y los criterios empleados por el sistema para priorizar la revisión manual de resultados. Debido a que el proyecto no cuenta aún con un conjunto de validación completamente etiquetado por especialistas, las métricas presentadas no deben interpretarse como valores definitivos de precisión, sensibilidad o \textit{mAP}; más bien constituyen una validación técnica inicial del alcance del modelo y de su integración dentro de la plataforma.
+
+SpeciesNet fue utilizado como modelo principal porque integra detección de objetos, clasificación de especies y combinación de resultados mediante un flujo de inferencia unificado. Para cada imagen procesada, el sistema obtiene una especie o categoría probable, un valor de confianza y, cuando está disponible, las coordenadas de la región donde se detectó el animal. Con base en estos valores, la plataforma clasifica cada resultado en categorías operativas como detección normal, alta prioridad o revisión manual.
+
+La Tabla~\ref{tab:cobertura_speciesnet_ecuador} resume la cobertura obtenida al comparar el catálogo ecuatoriano de especies incorporado al proyecto con las etiquetas y taxonomía disponibles en SpeciesNet.
+
+\begin{table}[H]
+\centering
+\caption{Cobertura de SpeciesNet respecto al catálogo ecuatoriano del proyecto}
+\label{tab:cobertura_speciesnet_ecuador}
+\begin{tabular}{lr}
+\toprule
+\textbf{Indicador} & \textbf{Valor} \\
+\midrule
+Entradas del catálogo revisadas & 2399 \\
+Coincidencias directas con especies del modelo & 347 \\
+Coincidencias por binomio en variantes taxonómicas & 9 \\
+Especies detectables y permitidas para Ecuador & 327 \\
+Coincidencias bloqueadas o no permitidas explícitamente para Ecuador & 29 \\
+Entradas no encontradas en taxonomía o etiquetas del modelo & 2043 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los resultados muestran que SpeciesNet ofrece una cobertura útil para una parte del catálogo local, especialmente en aves y mamíferos, pero no cubre la totalidad de las especies registradas en Ecuador. Esta situación confirma la necesidad de mantener un enfoque híbrido, en el cual la inteligencia artificial actúa como apoyo para reducir la carga de revisión, mientras que los investigadores validan los casos ambiguos, las especies no contempladas y las detecciones con baja confianza.
+
+\begin{table}[H]
+\centering
+\caption{Cobertura detectable por grupo taxonómico}
+\label{tab:cobertura_por_grupo}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Grupo taxonómico} & \textbf{Coincidencias detectables} & \textbf{Permitidas para Ecuador} \\
+\midrule
+Aves & 286 & 260 \\
+Mamíferos & 69 & 66 \\
+Reptiles & 1 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Desde el punto de vista operativo, el uso del nivel de confianza permite separar los resultados en dos grupos principales: detecciones que pueden ser consultadas directamente por el usuario y detecciones que requieren validación manual. En la plataforma se consideran de revisión prioritaria los resultados con confianza baja, las etiquetas demasiado generales, como \textit{Mammal}, \textit{Rodent}, \textit{Leopardus Species} o \textit{Possum Family}, y los casos en los que el modelo no identifica fauna de manera concluyente. Esta estrategia evita presentar resultados ambiguos como identificaciones definitivas y fortalece la trazabilidad del proceso de análisis.
+
+\section{Desarrollo e implementación del prototipo}
+\label{sec:desarrollo_implementacion_prototipo}
+
+El prototipo desarrollado corresponde a una plataforma web funcional orientada a apoyar el análisis de imágenes de cámaras trampa. La implementación se estructuró en módulos que permiten la autenticación de usuarios, la gestión de cámaras, la carga de imágenes individuales o archivos ZIP, el procesamiento automatizado con inteligencia artificial, la visualización de detecciones, la revisión manual, la generación de reportes y el análisis estadístico.
+
+La interfaz de usuario fue implementada con React y Next.js, utilizando TypeScript para mejorar la consistencia del código y reducir errores durante el desarrollo. La aplicación cuenta con un panel principal que presenta indicadores generales, detecciones recientes, acceso a cámaras registradas, análisis por especie, historial de detecciones, estadísticas, reportes y administración de usuarios. Además, incorpora soporte visual para los idiomas español e inglés, permitiendo adaptar los textos de la interfaz sin modificar los datos almacenados.
+
+En el backend, la plataforma utiliza rutas API de Next.js para coordinar las operaciones del sistema. Estas rutas reciben las solicitudes del frontend, validan la sesión del usuario, gestionan la carga de archivos, ejecutan el módulo de predicción en Python y registran los resultados en la base de datos. Para el acceso a datos se empleó Prisma ORM, mientras que PostgreSQL se utilizó como sistema de persistencia relacional.
+
+El procesamiento por lotes se implementó mediante un \textit{worker} independiente en Node.js. Este componente permite procesar archivos ZIP de manera asíncrona, actualizar el progreso del lote, registrar imágenes procesadas, manejar errores, aplicar reintentos y recuperar procesos atascados mediante un mecanismo de \textit{heartbeat}. Esta decisión mejora la experiencia del usuario, ya que la interfaz no queda bloqueada mientras se analizan grandes volúmenes de imágenes.
+
+\begin{table}[H]
+\centering
+\caption{Componentes implementados en el prototipo}
+\label{tab:componentes_implementados}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Componente} & \textbf{Resultado implementado} \\
+\midrule
+Autenticación & Registro, inicio de sesión, cierre de sesión y control de acceso por usuario. \\
+Gestión de cámaras & Registro de cámaras trampa con código, nombre, zona, descripción, estado y coordenadas. \\
+Análisis individual & Carga de una imagen, envío al módulo de IA y visualización de especie, confianza, prioridad y caja de detección. \\
+Análisis por lotes & Carga de archivos ZIP, creación de procesos \textit{BatchJob}, seguimiento de progreso y almacenamiento de resultados. \\
+Revisión manual & Bandeja de resultados ambiguos o de baja confianza, corrección de especie y trazabilidad de revisión. \\
+Reportes y estadísticas & Filtros por cámara, fecha, especie, prioridad, confianza y estado de revisión. \\
+Análisis de individuos & Asociación tentativa de detecciones que podrían corresponder al mismo individuo. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+La implementación del prototipo demuestra que los componentes principales se integran en un flujo único: el usuario carga las imágenes, el sistema ejecuta la inferencia, los resultados se almacenan en la base de datos y posteriormente pueden ser consultados, filtrados, revisados y exportados.
+
+\section{Simulación y Validación Técnica}
+\label{sec:simulacion_validacion_tecnica}
+
+La validación técnica se realizó mediante pruebas automatizadas, verificación de tipos, compilación de producción y revisión funcional del flujo de procesamiento por lotes. Estas actividades permitieron comprobar que los módulos principales del sistema funcionan de forma integrada y que las reglas críticas del sistema se comportan según lo esperado.
+
+Durante la validación se ejecutaron pruebas sobre el cálculo de progreso de lotes, políticas del \textit{worker}, clasificación de detecciones, revisión manual, emparejamiento tentativo de individuos, validación segura de archivos ZIP, autenticación, seguridad de origen, limitación de solicitudes y carga del catálogo de especies. En total, se ejecutaron 40 pruebas automatizadas, todas con resultado satisfactorio.
+
+\begin{table}[H]
+\centering
+\caption{Resumen de validación técnica del sistema}
+\label{tab:validacion_tecnica}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Prueba} & \textbf{Resultado} & \textbf{Observación} \\
+\midrule
+Verificación TypeScript & Correcto & Sin errores de tipado. \\
+Pruebas automatizadas & 40/40 correctas & Todas las pruebas finalizaron satisfactoriamente. \\
+Compilación de producción & Correcto & La aplicación compiló correctamente con Next.js. \\
+Rutas generadas & Correcto & Se generaron rutas web y API dinámicas. \\
+Advertencias de compilación & 1 advertencia & Advertencia no bloqueante relacionada con trazado NFT de Turbopack. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La advertencia observada durante la compilación no impidió la generación del proyecto ni la disponibilidad de las rutas principales. Esta advertencia se relaciona con el análisis de dependencias realizado por Turbopack y debe ser revisada antes de un despliegue definitivo, aunque no representa una falla funcional inmediata del prototipo.
+
+\subsection{Primera sesión de prueba}
+\label{subsec:primera_sesion_prueba}
+
+La primera sesión de prueba se orientó a validar el comportamiento lógico de los módulos internos de la plataforma. Se verificaron las reglas de cálculo de progreso de lotes, la clasificación de resultados válidos e inválidos, la priorización de revisiones manuales, la validación de archivos ZIP y las políticas de seguridad aplicadas a autenticación y solicitudes HTTP.
+
+\begin{table}[H]
+\centering
+\caption{Resultados de la primera sesión de prueba}
+\label{tab:primera_sesion_prueba}
+\begin{tabularx}{\textwidth}{lXc}
+\toprule
+\textbf{Área evaluada} & \textbf{Descripción} & \textbf{Resultado} \\
+\midrule
+Progreso de lotes & Cálculo de porcentaje, imágenes pendientes, velocidad y tiempo estimado. & Correcto \\
+Política del \textit{worker} & Validación de configuración, reintentos y lotes atascados. & Correcto \\
+Clasificación de detecciones & Separación entre especies válidas, etiquetas genéricas y resultados sin fauna. & Correcto \\
+Revisión manual & Identificación de resultados pendientes, confirmados, corregidos y descartados. & Correcto \\
+ZIP seguro & Aceptación de imágenes válidas y rechazo de rutas inseguras o archivos no permitidos. & Correcto \\
+Seguridad & Firma de sesión, validación de origen y limitación de solicitudes. & Correcto \\
+Catálogo de especies & Carga del catálogo ecuatoriano y búsqueda por nombres científicos o comunes. & Correcto \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Los resultados de esta sesión indican que la lógica central del sistema se comporta de forma estable frente a casos normales y casos de error. En particular, la validación de archivos ZIP es relevante porque evita procesar archivos que incluyan rutas maliciosas o formatos no permitidos, mientras que la política de revisión manual permite que los resultados inciertos no sean tratados como identificaciones definitivas.
+
+\subsection{Segunda sesión de prueba}
+\label{subsec:segunda_sesion_prueba}
+
+La segunda sesión de prueba se enfocó en la integración general del prototipo y en su preparación para ejecución en un entorno de producción. Para ello se ejecutó la verificación de tipos de TypeScript y la compilación optimizada de Next.js. La compilación generó correctamente las rutas de interfaz y las rutas API utilizadas por la plataforma.
+
+\begin{table}[H]
+\centering
+\caption{Resultados de la segunda sesión de prueba}
+\label{tab:segunda_sesion_prueba}
+\begin{tabularx}{\textwidth}{lXc}
+\toprule
+\textbf{Elemento evaluado} & \textbf{Descripción} & \textbf{Resultado} \\
+\midrule
+Tipado del proyecto & Ejecución de \texttt{tsc --noEmit} para validar consistencia TypeScript. & Correcto \\
+Compilación web & Generación optimizada de la aplicación con \texttt{next build}. & Correcto \\
+Rutas de usuario & Disponibilidad de páginas como inicio, cámaras, historial, estadísticas, reportes, usuarios, inicio de sesión y registro. & Correcto \\
+Rutas API & Disponibilidad de endpoints para análisis, autenticación, lotes, cámaras, detecciones, reportes, estadísticas, archivos e individuos. & Correcto \\
+Procesamiento por lotes & Existencia de lotes de prueba almacenados y archivo de progreso con 63 imágenes registradas en una prueba local. & Correcto \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+El resultado de esta sesión confirma que el prototipo puede compilarse como aplicación web completa y que las rutas necesarias para la operación del sistema se generan correctamente. Asimismo, el archivo de progreso de un lote local registró un total de 63 imágenes, evidenciando el funcionamiento del mecanismo de seguimiento de procesamiento por lotes. Para una validación científica definitiva, esta sesión debe complementarse con un conjunto de imágenes etiquetadas por especialistas, a fin de calcular métricas como precisión, exhaustividad, F1-score y matriz de confusión por especie.
+
+\section{Análisis Multimodal del Comportamiento}
+\label{sec:analisis_multimodal_comportamiento}
+
+El sistema desarrollado no se limita únicamente a almacenar la especie predicha por el modelo, sino que integra distintas fuentes de información asociadas a cada detección. Entre estas se incluyen la imagen original, la región de detección, la especie inferida, el nivel de confianza, la cámara asociada, la fecha de captura cuando está disponible, la ubicación de la cámara, los metadatos visibles extraídos de la imagen y la revisión manual realizada por el investigador.
+
+Esta integración permite un análisis multimodal básico, ya que combina información visual, espacial, temporal y taxonómica. La imagen y la caja de detección permiten revisar evidencia visual; la cámara y sus coordenadas permiten ubicar el registro en el área de monitoreo; la fecha de captura facilita analizar patrones temporales; y la clasificación taxonómica permite agrupar los registros por especie o grupo.
+
+Adicionalmente, la plataforma incorpora una función de asociación tentativa de individuos o reencuentros. Esta función considera la especie detectada, la cámara, la proximidad temporal, la distancia entre cámaras, el código visible de cámara extraído mediante OCR y una firma visual ligera del recorte del animal. El resultado no constituye una reidentificación científica definitiva, pero funciona como una preclasificación útil para que el investigador revise posibles registros repetidos de un mismo individuo.
+
+El enfoque multimodal mejora el valor analítico del sistema porque transforma una predicción aislada en un registro contextualizado. De esta manera, la plataforma no solo responde qué especie fue detectada, sino también dónde, cuándo, con qué nivel de confianza y bajo qué condiciones debe ser revisada.
+
+\section{Evaluación Técnica del Sistema}
+\label{sec:evaluacion_tecnica_sistema}
+
+La evaluación técnica evidencia que la plataforma cumple con los principales requerimientos funcionales definidos para el prototipo. El sistema permite cargar imágenes, procesarlas mediante inteligencia artificial, registrar resultados, visualizar detecciones, gestionar cámaras, revisar casos ambiguos y generar consultas estadísticas.
+
+Desde el punto de vista de arquitectura, el uso de una aplicación web con API interna simplifica la comunicación entre la interfaz y el backend. La incorporación de un \textit{worker} independiente para los lotes mejora la escalabilidad operativa, ya que separa el procesamiento pesado de la interacción del usuario. Asimismo, el almacenamiento estructurado mediante PostgreSQL permite mantener trazabilidad sobre usuarios, cámaras, lotes, detecciones, revisiones e individuos.
+
+En términos de seguridad y robustez, el sistema incorpora validación de archivos, protección de sesión, verificación de origen, limitación de solicitudes y manejo de errores en procesos por lotes. Estas características son importantes porque el sistema recibe archivos cargados por usuarios y ejecuta procesos de análisis automatizados sobre ellos.
+
+La principal limitación técnica identificada se relaciona con la dependencia del modelo SpeciesNet y su cobertura taxonómica. Aunque el modelo resulta adecuado como punto de partida, no cubre todas las especies del catálogo ecuatoriano ni garantiza desempeño uniforme en todos los contextos ambientales. Por ello, el sistema fue diseñado para incorporar revisión manual y exportación de un dataset curado, lo que permitirá fortalecer futuras etapas de entrenamiento o ajuste del modelo.
+
+\section{Discusión de Resultados}
+\label{sec:discusion_resultados}
+
+Los resultados obtenidos demuestran que es factible desarrollar una plataforma integrada para apoyar el monitoreo de fauna silvestre mediante inteligencia artificial. La solución implementada reduce la dependencia de una revisión completamente manual, organiza los resultados en una base de datos consultable y proporciona herramientas para que los investigadores prioricen su atención en imágenes relevantes o ambiguas.
+
+El análisis de cobertura muestra que SpeciesNet puede reconocer una parte significativa de especies de interés, especialmente aves y mamíferos presentes en Ecuador. Sin embargo, la cantidad de especies no encontradas en la taxonomía del modelo evidencia que la plataforma no debe considerarse un sistema cerrado o definitivo. En lugar de reemplazar al especialista, la herramienta actúa como apoyo para filtrar, ordenar y acelerar el análisis.
+
+La validación técnica también muestra que el prototipo cuenta con una base de software estable. Las pruebas automatizadas verifican componentes críticos del sistema, mientras que la compilación de producción confirma que la aplicación puede prepararse para despliegue. No obstante, para evaluar el desempeño científico del modelo se requiere una fase adicional con imágenes reales de Proyecto Sacha etiquetadas por expertos, separadas en conjuntos de entrenamiento, validación y prueba.
+
+En este sentido, el principal aporte del proyecto no se limita al uso de un modelo de inteligencia artificial, sino a la integración de dicho modelo dentro de un flujo de trabajo completo: carga de imágenes, procesamiento, almacenamiento, visualización, revisión, corrección, trazabilidad y generación de datos curados.
+
+\section{Cumplimiento de Objetivos e Hipótesis}
+\label{sec:cumplimiento_objetivos_hipotesis}
+
+El desarrollo de \textit{WildlifeAI} permitió cumplir el objetivo general del proyecto, consistente en automatizar el proceso de detección y clasificación de especies de vida silvestre en imágenes obtenidas por cámaras trampa mediante una plataforma basada en inteligencia artificial. El sistema implementado permite procesar imágenes individuales y lotes de imágenes, registrar resultados y presentarlos en una interfaz orientada al análisis.
+
+\subsection{Objetivos Específicos}
+\label{subsec:objetivos_especificos}
+
+El primer objetivo específico, relacionado con el diseño de un modelo de preprocesamiento y procesamiento de imágenes provenientes de cámaras trampa, se cumple mediante la validación de formatos, el manejo seguro de archivos ZIP, la extracción de imágenes para procesamiento por lotes, la lectura de metadatos visibles cuando están disponibles y la preparación de archivos para el módulo de inferencia.
+
+El segundo objetivo específico, orientado a implementar algoritmos de inteligencia artificial y visión por computadora, se cumple mediante la integración de SpeciesNet como flujo principal de detección y clasificación. Además, el sistema conserva rutas de respaldo operativo mediante MegaDetector y YOLO en caso de que el flujo principal no esté disponible.
+
+El tercer objetivo específico, enfocado en desarrollar una plataforma de visualización y gestión de resultados, se cumple mediante la implementación del dashboard web, el módulo de cámaras, el historial de detecciones, las estadísticas, los reportes, la revisión manual y el análisis por especies e individuos.
+
+\begin{table}[H]
+\centering
+\caption{Cumplimiento de objetivos específicos}
+\label{tab:cumplimiento_objetivos}
+\begin{tabularx}{\textwidth}{lXc}
+\toprule
+\textbf{Objetivo} & \textbf{Evidencia de cumplimiento} & \textbf{Estado} \\
+\midrule
+Preprocesamiento y procesamiento de imágenes & Validación de formatos, manejo de ZIP, procesamiento individual y por lotes, extracción de metadatos y registro de progreso. & Cumplido \\
+IA y visión por computadora & Integración de SpeciesNet, generación de especie, confianza, prioridad y cajas de detección cuando están disponibles. & Cumplido \\
+Visualización y gestión de resultados & Dashboard, cámaras, historial, estadísticas, reportes, revisiones manuales y análisis por especies e individuos. & Cumplido \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Validación de la Hipótesis}
+\label{subsec:validacion_hipotesis}
+
+La hipótesis del proyecto plantea que una plataforma basada en inteligencia artificial puede contribuir a automatizar y optimizar el análisis de imágenes de cámaras trampa para apoyar el monitoreo de fauna silvestre. Los resultados técnicos obtenidos respaldan esta hipótesis, ya que el sistema permite analizar imágenes, almacenar resultados, generar indicadores y reducir la revisión manual indiscriminada mediante la priorización de casos relevantes.
+
+No obstante, la validación debe considerarse parcial desde el punto de vista científico, debido a que aún se requiere evaluar el modelo con un conjunto de imágenes reales etiquetadas por especialistas. Con dicha información será posible calcular métricas cuantitativas de clasificación por especie y determinar con mayor precisión el impacto del sistema en condiciones de campo.
+
+Por tanto, la hipótesis se valida técnicamente a nivel de prototipo funcional, mientras que su validación estadística definitiva queda sujeta a una fase posterior de evaluación con datos etiquetados de Proyecto Sacha.
+
+\section{Impacto y Proyección}
+\label{sec:impacto_proyeccion}
+
+El impacto principal de la plataforma se relaciona con la reducción del esfuerzo requerido para revisar grandes volúmenes de imágenes obtenidas por cámaras trampa. En lugar de analizar manualmente todas las fotografías, los investigadores pueden utilizar el sistema para filtrar imágenes sin detección, priorizar registros de interés, consultar especies identificadas y revisar únicamente los casos ambiguos o relevantes.
+
+Para Proyecto Sacha, la plataforma representa una herramienta de apoyo a las actividades de monitoreo, conservación e investigación. Al centralizar la información de cámaras, detecciones y revisiones, el sistema facilita la trazabilidad de los registros y mejora la organización de los datos generados durante las campañas de monitoreo.
+
+Como proyección, el sistema puede evolucionar hacia tres líneas principales. La primera consiste en consolidar un dataset curado con imágenes revisadas por especialistas, lo cual permitiría entrenar o ajustar modelos más específicos para fauna ecuatoriana. La segunda se relaciona con la mejora de la reidentificación de individuos mediante modelos especializados para patrones visuales. La tercera corresponde al despliegue de la plataforma en un entorno productivo supervisado, con almacenamiento seguro, copias de respaldo y monitoreo permanente del \textit{worker}.
+
+\section{Análisis Económico}
+\label{sec:analisis_economico}
+
+El análisis económico se presenta como una estimación referencial de los recursos necesarios para implementar y mantener la plataforma. Debido a que los costos de hardware, servicios en la nube y despliegue pueden variar según proveedor, disponibilidad y país, los valores deben actualizarse con cotizaciones vigentes antes de una implementación final.
+
+\subsection{Costos de Hardware}
+\label{subsec:costos_hardware}
+
+La plataforma puede ejecutarse inicialmente en un computador de desarrollo o en un servidor local con capacidad suficiente para procesar imágenes. En caso de requerir inferencia más rápida, especialmente con grandes lotes de fotografías, se recomienda considerar un equipo con GPU compatible. La Tabla~\ref{tab:costos_hardware} presenta una estimación referencial.
+
+\begin{table}[H]
+\centering
+\caption{Costos referenciales de hardware}
+\label{tab:costos_hardware}
+\begin{tabularx}{\textwidth}{lrrX}
+\toprule
+\textbf{Recurso} & \textbf{Cantidad} & \textbf{Costo estimado USD} & \textbf{Observación} \\
+\midrule
+Computador o servidor local & 1 & 700--1200 & Equipo para ejecutar la plataforma, base de datos y procesamiento moderado. \\
+Almacenamiento externo o disco adicional & 1 & 80--150 & Respaldo de imágenes, lotes ZIP y base de datos. \\
+GPU dedicada opcional & 1 & 300--800 & Mejora tiempos de inferencia en lotes grandes; no es obligatoria para el prototipo. \\
+UPS o respaldo eléctrico & 1 & 80--180 & Recomendado para evitar interrupciones durante procesamiento por lotes. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Costos de Desarrollo y Configuración}
+\label{subsec:costos_desarrollo_configuracion}
+
+Los costos de desarrollo corresponden al esfuerzo invertido en análisis, diseño, programación, configuración de base de datos, integración de inteligencia artificial, pruebas y documentación. En el contexto del presente trabajo de titulación, estos costos se consideran cubiertos por el desarrollo académico del proyecto. Sin embargo, para una implementación institucional, deben estimarse como horas técnicas de desarrollo y soporte.
+
+\begin{table}[H]
+\centering
+\caption{Costos referenciales de desarrollo y configuración}
+\label{tab:costos_desarrollo}
+\begin{tabularx}{\textwidth}{lrrX}
+\toprule
+\textbf{Actividad} & \textbf{Horas estimadas} & \textbf{Costo estimado USD} & \textbf{Observación} \\
+\midrule
+Análisis y diseño del sistema & 40 & 0--600 & Levantamiento de requerimientos y arquitectura. \\
+Desarrollo frontend y backend & 120 & 0--1800 & Implementación de interfaz, API, base de datos y módulos de gestión. \\
+Integración de IA & 60 & 0--900 & Configuración de SpeciesNet, scripts Python y flujo de inferencia. \\
+Pruebas y documentación & 40 & 0--600 & Validación técnica, pruebas automatizadas y documentación de uso. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Los valores se expresan como rangos porque el proyecto fue desarrollado en un contexto académico. El valor cero representa el escenario de desarrollo propio, mientras que el valor superior representa una posible estimación si el trabajo fuese contratado externamente.
+
+\subsection{Costos de Producción y Despliegue}
+\label{subsec:costos_produccion_despliegue}
+
+Para el despliegue de la plataforma existen dos alternativas principales: instalación local en infraestructura propia o despliegue en servicios en la nube. La primera opción puede reducir costos mensuales, pero requiere administración técnica local. La segunda facilita disponibilidad remota y mantenimiento, aunque implica pagos recurrentes.
+
+\begin{table}[H]
+\centering
+\caption{Costos referenciales de producción y despliegue}
+\label{tab:costos_produccion}
+\begin{tabularx}{\textwidth}{lrrX}
+\toprule
+\textbf{Recurso} & \textbf{Periodicidad} & \textbf{Costo estimado USD} & \textbf{Observación} \\
+\midrule
+Dominio web & Anual & 12--25 & Requerido si se publica la plataforma en Internet. \\
+Servidor o hosting de aplicación & Mensual & 0--40 & Puede ser local, gratuito limitado o servicio de pago. \\
+Base de datos administrada & Mensual & 0--30 & PostgreSQL local o servicio administrado. \\
+Almacenamiento de imágenes & Mensual & 0--25 & Depende del volumen de fotografías procesadas. \\
+Copias de seguridad & Mensual & 0--20 & Recomendado para resguardar datos e imágenes. \\
+Mantenimiento técnico & Mensual & 0--100 & Actualizaciones, soporte, revisión de errores y monitoreo. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+En una etapa inicial, el prototipo puede operar con costos reducidos utilizando infraestructura local y herramientas de código abierto. Para una operación sostenida, se recomienda presupuestar almacenamiento, respaldos, mantenimiento y supervisión del proceso de inferencia, especialmente si se procesarán miles de imágenes por ciclo de monitoreo.
+
+En conjunto, el análisis económico muestra que la plataforma es viable como prototipo académico y puede escalar progresivamente según las necesidades de Proyecto Sacha. La mayor inversión no se concentra únicamente en el software, sino en el almacenamiento, la capacidad de procesamiento y el mantenimiento operativo necesarios para sostener el análisis continuo de imágenes de cámaras trampa.

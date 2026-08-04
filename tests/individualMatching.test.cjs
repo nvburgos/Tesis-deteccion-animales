@@ -86,7 +86,7 @@ test('penalizes distant cameras with weak time evidence', () => {
   assert.equal(result.score < 65, true)
 })
 
-test('allows nearby cameras with plausible timing as probable reencounter', () => {
+test('does not accept nearby cameras and timing without strong visual evidence', () => {
   const detection = {
     cameraId: 1,
     camera: { id: 1, latitude: -2.1800, longitude: -79.8800, zone: 'Bosque' },
@@ -109,7 +109,7 @@ test('allows nearby cameras with plausible timing as probable reencounter', () =
   }
   const result = scoreIndividualCandidate(detection, candidate)
 
-  assert.equal(result.score >= 65, true)
+  assert.equal(result.score < 82, true)
 })
 
 test('adds visual evidence when crop pattern is similar', () => {
@@ -139,7 +139,7 @@ test('adds visual evidence when crop pattern is similar', () => {
   })
 
   assert.equal(withVisual.score > withoutVisual.score, true)
-  assert.equal(withVisual.basis.includes('patron visual similar 86%'), true)
+  assert.equal(withVisual.basis.includes('rasgos visuales y patron corporal similares 86%'), true)
 })
 
 test('penalizes visually different crop pattern', () => {
@@ -165,11 +165,11 @@ test('penalizes visually different crop pattern', () => {
     visualSimilarity: 25
   })
 
-  assert.equal(result.basis.includes('patron visual distinto 25%'), true)
+  assert.equal(result.basis.includes('rasgos visuales distintos 25%'), true)
 })
 
 
-test('uses visible camera code when camera relation is missing', () => {
+test('uses visible camera code as supporting evidence only', () => {
   const capturedAt = new Date('2026-07-27T10:00:00.000Z')
   const candidate = {
     cameraId: null,
@@ -190,6 +190,6 @@ test('uses visible camera code when camera relation is missing', () => {
     userId: 1
   }, candidate)
 
-  assert.equal(result.score >= 65, true)
+  assert.equal(result.score < 82, true)
   assert.equal(result.basis.includes('mismo codigo visible de camara 0001 en intervalo corto'), true)
 })

@@ -127,7 +127,7 @@ export default function HistorialPage() {
         setError(loadError instanceof Error ? loadError.message : 'Error cargando historial')
       })
       .finally(() => setIsLoading(false))
-  }, [cameraFilter, dateFilter, pagination.page, pagination.pageSize, researcherFilter, speciesFilter])
+  }, [cameraFilter, dateFilter, investigators.length, pagination.page, pagination.pageSize, researcherFilter, speciesFilter])
 
   const speciesOptions = useMemo(
     () => availableSpecies.filter(Boolean).sort((a, b) => a.localeCompare(b)),

@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BarChart3, Camera, CheckCircle2, ChevronLeft, ChevronRight, Eye, HelpCircle, PawPrint, Pencil, Search, SlidersHorizontal, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, BarChart3, Camera, CheckCircle2, ChevronLeft, ChevronRight, Eye, HelpCircle, Images, PawPrint, Pencil, Search, SlidersHorizontal, Users, XCircle } from 'lucide-react'
 import type { UiText } from '@/lib/i18n'
 import type { CameraSummary, Language, RecentDetection } from './dashboardTypes'
 
@@ -418,6 +419,7 @@ export default function SpeciesGallery({
                       <small>{formatDate(individual.firstDetectedAt)} - {formatDate(individual.lastDetectedAt)}</small>
                       <div className="individualCardActions">
                         {individual.id ? <button className="secondaryButton" disabled={savingIndividualId === individual.id} onClick={() => renameIndividual(individual)} type="button"><Pencil size={15} /> {savingIndividualId === individual.id ? 'Guardando...' : 'Guardar nombre'}</button> : null}
+                        {individual.id ? <Link className="secondaryButton" href={`/individuals/${individual.id}`}><Images size={15} /> Ver fotos</Link> : null}
                         <button className="secondaryButton" onClick={() => startComparison(individual)} type="button"><Eye size={15} /> Comparar</button>
                       </div>
                     </div>

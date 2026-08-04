@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ClipboardCheck, FileText, Grid2X2, PawPrint, Sprout, Users } from 'lucide-react'
+import { ClipboardCheck, DatabaseZap, FileText, Grid2X2, PawPrint, Sprout, Users } from 'lucide-react'
 import { uiText, type UiText } from '@/lib/i18n'
 import type { DashboardView } from './dashboardTypes'
 
@@ -16,6 +16,7 @@ const navItems: { labelKey: keyof UiText; icon: typeof Grid2X2; view: DashboardV
 const primaryRouteItems = [{ href: '/cameras', label: 'Panel de Control', icon: Grid2X2 }]
 const secondaryRouteItems = [
   { href: '/reports', label: 'Reportes', icon: FileText },
+  { href: '/dataset', label: 'Dataset', icon: DatabaseZap },
   { href: '/historial', label: 'Historial', icon: FileText },
   { href: '/statistics', label: 'Estadisticas', icon: PawPrint }
 ]

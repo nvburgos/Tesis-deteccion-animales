@@ -43,6 +43,9 @@ model Detection {
   individualMatchStatus  String?
   individualMatchConfidence Float?
   individualMatchBasis   String?
+  validatedSpeciesId     Int?
+  validatedSpecies       Species? @relation("ValidatedDetectionSpecies", fields: [validatedSpeciesId], references: [id], onDelete: SetNull)
+  trainingSample         TrainingSample?
   createdAt              DateTime  @default(now())
 
   @@index([cameraId])
@@ -59,8 +62,52 @@ model Detection {
   @@index([cameraId, capturedAt])
   @@index([batchJobId, species])
   @@index([individualId])
+  @@index([validatedSpeciesId])
   @@index([species, capturedAt])
   @@index([cameraTrapCode])
+}
+
+model Species {
+  id                   Int              @id @default(autoincrement())
+  scientificName       String           @unique
+  commonName           String?
+  taxonomicGroup       String
+  family               String?
+  orderName            String?
+  source               String?
+  conservationStatus   String?
+  isTrainable          Boolean          @default(true)
+  minImagesForTraining Int              @default(50)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  validatedDetections  Detection[]      @relation("ValidatedDetectionSpecies")
+  trainingSamples      TrainingSample[]
+
+  @@index([taxonomicGroup])
+  @@index([isTrainable])
+}
+
+model TrainingSample {
+  id            Int       @id @default(autoincrement())
+  detectionId   Int       @unique
+  detection     Detection @relation(fields: [detectionId], references: [id], onDelete: Cascade)
+  speciesId     Int
+  species       Species   @relation(fields: [speciesId], references: [id], onDelete: Restrict)
+  label         String
+  imagePath     String
+  cropImagePath String?
+  status        String    @default("trainable")
+  split         String?
+  quality       String?
+  reviewedById  Int?
+  reviewedBy    User?     @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([speciesId])
+  @@index([status])
+  @@index([split])
+  @@index([reviewedById])
 }
 
 model Individual {
@@ -118,6 +165,7 @@ model User {
   detections         Detection[]
   reviewedDetections Detection[] @relation("DetectionReviewer")
   batchJobs          BatchJob[]
+  trainingSamples    TrainingSample[]
 }
 
 model Camera {

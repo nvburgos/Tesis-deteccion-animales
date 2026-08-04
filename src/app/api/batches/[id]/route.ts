@@ -6,7 +6,6 @@ import type { Prisma } from '@prisma/client'
 import { AUTH_COOKIE, getSessionUserId, isAdminRole } from '@/lib/auth'
 import { ensureDatabase } from '@/lib/database'
 import { prisma } from '@/lib/prisma'
-import { toProtectedDetectionImagePath } from '@/lib/fileStorage'
 import { formatRelativeDate } from '@/lib/detections'
 import { calculateBatchProgress } from '@/lib/batchProgress'
 import { invalidSpeciesValues, isValidSpecies } from '@/lib/detectionClassification'
@@ -16,6 +15,10 @@ export const dynamic = 'force-dynamic'
 
 const manualReviewPriorityValues = ['Revision manual', 'Revisi?n manual', 'REVISION MANUAL', 'Manual review']
 const terminalReviewStatuses = ['Confirmada', 'Corregida', 'Sin fauna', 'No evaluable', 'Descartada']
+
+function toProtectedDetectionImagePath(detectionId: number) {
+  return `/api/files/${detectionId}`
+}
 
 function appendWhereAnd(where: Prisma.DetectionWhereInput, condition: Prisma.DetectionWhereInput) {
   where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), condition]
@@ -47,17 +50,11 @@ function reviewedManualReviewCondition(): Prisma.DetectionWhereInput {
 }
 
 function getStorageRoot() {
-  return path.resolve(process.env.STORAGE_ROOT || path.join(process.cwd(), 'storage'))
-}
-
-function getBatchRoot(batchId: number) {
-  const storageRoot = path.join(getStorageRoot(), 'uploads', 'batches', String(batchId))
-  const publicRoot = path.join(process.cwd(), 'public', 'uploads', 'batches', String(batchId))
-  return existsSync(storageRoot) || !existsSync(publicRoot) ? storageRoot : publicRoot
+  return path.resolve(process.env.STORAGE_ROOT || 'storage')
 }
 
 function readBatchProgressState(batchId: number) {
-  const statePath = path.join(getBatchRoot(batchId), '.progress.json')
+  const statePath = path.join(getStorageRoot(), 'uploads', 'batches', String(batchId), '.progress.json')
   if (!existsSync(statePath)) {
     return null
   }

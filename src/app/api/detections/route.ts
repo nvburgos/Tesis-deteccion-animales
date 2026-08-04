@@ -11,6 +11,7 @@ import { getManualReviewStatus, isManualReviewStatus } from '@/lib/manualReviewP
 import { hasDetectionCaptureColumns } from '@/lib/detectionCaptureColumns'
 import { forbiddenByCsrf, verifySameOrigin } from '@/lib/requestSecurity'
 import { assignIndividualMatch } from '@/lib/individualMatching'
+import { syncTrainingSampleForDetection } from '@/lib/trainingSamples'
 
 export const dynamic = 'force-dynamic'
 
@@ -474,6 +475,9 @@ export async function PATCH(request: NextRequest) {
   })
   await assignIndividualMatch(updatedDetection.id).catch((error) => {
     console.error('No se pudo recalcular reencuentro tras revision manual:', error)
+  })
+  await syncTrainingSampleForDetection(updatedDetection.id, currentUser.id).catch((error) => {
+    console.error('No se pudo sincronizar muestra curada tras revision manual:', error)
   })
   const refreshedDetection = await prisma.detection.findUnique({
     where: { id: updatedDetection.id },

@@ -19,7 +19,6 @@ function loadDotenv() {
 loadDotenv()
 
 const prisma = new PrismaClient()
-const curatedStatuses = ['Confirmada', 'Corregida']
 
 function argValue(name) {
   const index = process.argv.indexOf(name)
@@ -76,42 +75,44 @@ function escapeCsv(value) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`
 }
 
-function datasetLabel(detection) {
-  return detection.manualCorrectedSpecies?.trim() || detection.species
-}
-
 async function main() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
   const outDir = path.resolve(argValue('--out') || path.join(getStorageRoot(), 'exports', `curated-dataset-${timestamp}`))
   const limit = Number(argValue('--limit') || '')
   const cameraId = Number(argValue('--camera-id') || '')
   const dryRun = hasFlag('--dry-run')
-  const where = {
-    manualReviewStatus: { in: curatedStatuses },
-    manualReviewedAt: { not: null }
-  }
+  const where = { status: 'trainable' }
 
   if (Number.isInteger(cameraId) && cameraId > 0) {
-    where.cameraId = cameraId
+    where.detection = { cameraId }
   }
 
-  const detections = await prisma.detection.findMany({
+  const samples = await prisma.trainingSample.findMany({
     where,
-    orderBy: [{ manualReviewedAt: 'desc' }, { id: 'asc' }],
+    orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     take: Number.isInteger(limit) && limit > 0 ? limit : undefined,
     select: {
       id: true,
+      label: true,
       imagePath: true,
-      species: true,
-      confidence: true,
-      capturedAt: true,
-      cameraTrapCode: true,
-      manualOriginalSpecies: true,
-      manualCorrectedSpecies: true,
-      manualReviewStatus: true,
-      manualReviewedAt: true,
-      camera: { select: { code: true, id: true, name: true, zone: true } },
-      reviewedBy: { select: { email: true, id: true, name: true } }
+      status: true,
+      createdAt: true,
+      detection: {
+        select: {
+          id: true,
+          species: true,
+          confidence: true,
+          capturedAt: true,
+          cameraTrapCode: true,
+          manualOriginalSpecies: true,
+          manualCorrectedSpecies: true,
+          manualReviewStatus: true,
+          manualReviewedAt: true,
+          camera: { select: { code: true, id: true, name: true, zone: true } }
+        }
+      },
+      reviewedBy: { select: { email: true, id: true, name: true } },
+      species: { select: { scientificName: true, taxonomicGroup: true } }
     }
   })
   const manifest = []
@@ -122,13 +123,14 @@ async function main() {
     await mkdir(outDir, { recursive: true })
   }
 
-  for (const detection of detections) {
-    const label = datasetLabel(detection)
-    const sourcePath = resolveStoredDetectionPath(detection.imagePath)
+  for (const sample of samples) {
+    const detection = sample.detection
+    const label = sample.label
+    const sourcePath = resolveStoredDetectionPath(sample.imagePath)
 
     if (!sourcePath) {
       missing += 1
-      console.warn(`[dataset] archivo no encontrado detection=${detection.id} path=${detection.imagePath}`)
+      console.warn(`[dataset] archivo no encontrado sample=${sample.id} detection=${detection.id} path=${sample.imagePath}`)
       continue
     }
 
@@ -147,6 +149,8 @@ async function main() {
       detectionId: detection.id,
       file: relativePath,
       label,
+      sampleId: sample.id,
+      taxonomicGroup: sample.species.taxonomicGroup,
       originalPrediction: detection.manualOriginalSpecies || detection.species,
       correctedSpecies: detection.manualCorrectedSpecies || '',
       confidence: Math.round(detection.confidence),
@@ -160,11 +164,13 @@ async function main() {
     copied += 1
   }
 
-  const headers = ['detection_id', 'file', 'label', 'original_prediction', 'corrected_species', 'confidence', 'review_status', 'reviewed_at', 'reviewed_by', 'camera_code', 'camera_trap_code', 'captured_at']
+  const headers = ['sample_id', 'detection_id', 'file', 'label', 'taxonomic_group', 'original_prediction', 'corrected_species', 'confidence', 'review_status', 'reviewed_at', 'reviewed_by', 'camera_code', 'camera_trap_code', 'captured_at']
   const rows = manifest.map((row) => [
+    row.sampleId,
     row.detectionId,
     row.file,
     row.label,
+    row.taxonomicGroup,
     row.originalPrediction,
     row.correctedSpecies,
     row.confidence,
@@ -182,7 +188,7 @@ async function main() {
     await writeFile(path.join(outDir, 'dataset.json'), JSON.stringify({ generatedAt: new Date().toISOString(), total: manifest.length, items: manifest }, null, 2), 'utf8')
   }
 
-  console.log(JSON.stringify({ copied, dryRun, missing, outDir, reviewed: detections.length }, null, 2))
+  console.log(JSON.stringify({ copied, dryRun, missing, outDir, samples: samples.length }, null, 2))
 }
 
 main()

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 export function getStorageRoot() {
-  return path.resolve(process.env.STORAGE_ROOT || path.join(/*turbopackIgnore: true*/ process.cwd(), 'storage'))
+  return path.resolve(process.env.STORAGE_ROOT || 'storage')
 }
 
 export function toProtectedDetectionImagePath(detectionId: number) {
@@ -16,16 +16,16 @@ function isInside(root: string, candidate: string) {
 
 export function resolveStoredDetectionPath(imagePath: string) {
   const storageRoot = getStorageRoot()
-  const publicUploadsRoot = path.resolve(process.cwd(), 'public', 'uploads')
+  const publicUploadsRoot = path.resolve('public', 'uploads')
   const normalized = imagePath.replace(/\\/g, '/')
   const candidates: string[] = []
 
   if (normalized.startsWith('/uploads/')) {
-    candidates.push(path.resolve(process.cwd(), 'public', normalized.slice(1)))
+    candidates.push(path.resolve('public', normalized.slice(1)))
     candidates.push(path.resolve(storageRoot, normalized.slice('/'.length)))
   } else if (normalized.startsWith('uploads/')) {
     candidates.push(path.resolve(storageRoot, normalized))
-    candidates.push(path.resolve(process.cwd(), 'public', normalized))
+    candidates.push(path.resolve('public', normalized))
   } else if (!path.isAbsolute(normalized) && !normalized.split('/').includes('..')) {
     candidates.push(path.resolve(storageRoot, normalized))
   }

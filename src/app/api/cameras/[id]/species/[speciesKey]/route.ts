@@ -193,7 +193,7 @@ function buildIndividualSummaries(detections: Array<{
   })
 
   return [...summaries.values()]
-    .map(({ confidenceTotal, ...summary }) => summary)
+    .map(({ confidenceTotal: _confidenceTotal, ...summary }) => summary)
     .sort((left, right) => right.detectionCount - left.detectionCount || Number(left.id ?? 0) - Number(right.id ?? 0))
 }
 

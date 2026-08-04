@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import shutil
 
 from ultralytics import YOLO
@@ -7,6 +8,18 @@ from ultralytics import YOLO
 ROOT = Path(__file__).resolve().parent
 DATASET_YAML = ROOT / "dataset" / "data.yaml"
 OUTPUT_MODEL = ROOT / "best.pt"
+RUNS_ROOT = ROOT / "runs"
+
+
+def env_int(name, default):
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def env_value(name, default):
+    return os.environ.get(name, default)
 
 
 def validate_dataset():
@@ -45,14 +58,20 @@ def validate_dataset():
 def main():
     validate_dataset()
 
-    model = YOLO("yolov8n.pt")
+    base_model = env_value("YOLO_BASE_MODEL", "yolov8n.pt")
+    epochs = env_int("YOLO_EPOCHS", 25)
+    imgsz = env_int("YOLO_IMGSZ", 640)
+    batch = env_int("YOLO_BATCH", 8)
+    run_name = env_value("YOLO_RUN_NAME", "wildlife-curated")
+
+    model = YOLO(base_model)
     results = model.train(
         data=str(DATASET_YAML),
-        epochs=5,
-        imgsz=640,
-        batch=8,
-        project=str(ROOT / "runs"),
-        name="wildlife",
+        epochs=epochs,
+        imgsz=imgsz,
+        batch=batch,
+        project=str(RUNS_ROOT),
+        name=run_name,
         exist_ok=True,
     )
 

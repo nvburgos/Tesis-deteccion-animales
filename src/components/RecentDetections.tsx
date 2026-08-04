@@ -115,7 +115,11 @@ export default function RecentDetections({
                     <td className="speciesCell">
                       {speciesLabel}
                       {individualSummary ? (
-                        <span className="tableSubtext">{individualSummary}</span>
+                        detection.individualId ? (
+                          <Link className="tableSubtext tableInlineLink" href={`/individuals/${detection.individualId}`}>{individualSummary}</Link>
+                        ) : (
+                          <span className="tableSubtext">{individualSummary}</span>
+                        )
                       ) : null}
                       {detection.manualReviewNote ? (
                         <span className="tableSubtext">Observacion: {detection.manualReviewNote}</span>

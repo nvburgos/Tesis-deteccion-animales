@@ -1,6 +1,7 @@
 'use client'
 
 import { AlertTriangle, CheckCircle2, SearchX } from 'lucide-react'
+import Link from 'next/link'
 import DetectionImage from './DetectionImage'
 import { getSpeciesLabel, uiText, type UiText } from '@/lib/i18n'
 import type { DetectionResultData, Language, Priority } from './dashboardTypes'
@@ -28,6 +29,11 @@ function getPriorityLabel(priority: Priority, language: Language) {
 
 function getIndividualLabel(result: DetectionResultData) {
   return result.individual?.label ?? (result.individualId ? `Individuo #${result.individualId}` : null)
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return null
+  return new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
 export default function DetectionResult({
@@ -79,8 +85,27 @@ export default function DetectionResult({
             {getIndividualLabel(result) ? (
               <div>
                 <span>Individuo</span>
-                <strong>{getIndividualLabel(result)}</strong>
+                {result.individualId ? (
+                  <Link className="individualInlineLink" href={`/individuals/${result.individualId}`}>
+                    {getIndividualLabel(result)}
+                  </Link>
+                ) : (
+                  <strong>{getIndividualLabel(result)}</strong>
+                )}
                 {result.individualMatchStatus ? <small>{result.individualMatchStatus}</small> : null}
+              </div>
+            ) : null}
+            {hasSpecies && result.sameSpeciesStatus ? (
+              <div>
+                <span>Coincidencia de especie</span>
+                <strong>{result.sameSpeciesStatus}</strong>
+                {typeof result.previousSameSpeciesCount === 'number' && result.previousSameSpeciesCount > 0 ? (
+                  <small>
+                    {result.previousSameSpeciesCount} registro{result.previousSameSpeciesCount === 1 ? '' : 's'} previo{result.previousSameSpeciesCount === 1 ? '' : 's'}
+                    {result.sameSpeciesLastLocation ? ` · ${result.sameSpeciesLastLocation}` : ''}
+                    {formatDateTime(result.sameSpeciesLastDetectedAt) ? ` · ${formatDateTime(result.sameSpeciesLastDetectedAt)}` : ''}
+                  </small>
+                ) : null}
               </div>
             ) : null}
           </div>

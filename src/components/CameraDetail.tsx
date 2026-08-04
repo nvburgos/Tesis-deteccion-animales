@@ -176,6 +176,10 @@ function normalizeResult(result: BackendAnalyzeResponse, language: Language): De
     individualMatchConfidence: result.individualMatchConfidence,
     individualMatchBasis: result.individualMatchBasis,
     individual: result.individual,
+    previousSameSpeciesCount: result.previousSameSpeciesCount,
+    sameSpeciesLastDetectedAt: result.sameSpeciesLastDetectedAt,
+    sameSpeciesLastLocation: result.sameSpeciesLastLocation,
+    sameSpeciesStatus: result.sameSpeciesStatus,
     coordinates: result.coordinates ?? null
   }
 }

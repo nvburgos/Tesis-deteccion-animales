@@ -1,6 +1,6 @@
 'use client'
 
-import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BadgeCheck,
   CheckCircle2,
@@ -298,7 +298,7 @@ function ManualReviewImageViewer({
     setIsDragging(false)
     setViewMode(hasBoundingBox(detection) ? 'detection' : 'original')
     dragStart.current = null
-  }, [detection.id])
+  }, [detection])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -494,25 +494,6 @@ export default function ManualReviewsPanel({
     }
   }, [pendingReviewItemsForFilter.length, queueFilter])
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target) || !activeReview) return
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        goPrevious()
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        goNext()
-      } else if (event.ctrlKey && event.key === 'Enter') {
-        event.preventDefault()
-        handleSave(activeReview.id, 'next')
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeReview, activeIndex, pendingReviews.length, currentSpecies, currentNote])
-
   function updateSpecies(detectionId: number, species: string) {
     setSpeciesByDetection((current) => ({ ...current, [detectionId]: species }))
   }
@@ -521,17 +502,17 @@ export default function ManualReviewsPanel({
     setGroupByDetection((current) => ({ ...current, [detectionId]: group }))
   }
 
-  function goPrevious() {
+  const goPrevious = useCallback(() => {
     setActiveIndex((current) => Math.max(0, current - 1))
     setError('')
     setSuccess('')
-  }
+  }, [])
 
-  function goNext() {
+  const goNext = useCallback(() => {
     setActiveIndex((current) => Math.min(Math.max(0, pendingReviews.length - 1), current + 1))
     setError('')
     setSuccess('')
-  }
+  }, [pendingReviews.length])
 
   function skipCurrent() {
     if (!activeReview) return
@@ -545,7 +526,7 @@ export default function ManualReviewsPanel({
     }
   }
 
-  async function handleSave(detectionId: number, mode: 'stay' | 'next', override?: { species: string; note?: string; manualReviewStatus?: string }) {
+  const handleSave = useCallback(async (detectionId: number, mode: 'stay' | 'next', override?: { species: string; note?: string; manualReviewStatus?: string }) => {
     setSavingId(detectionId)
     setError('')
     setSuccess('')
@@ -589,7 +570,26 @@ export default function ManualReviewsPanel({
     } finally {
       setSavingId(null)
     }
-  }
+  }, [notes, onReviewCompleted, pendingReviews, speciesByDetection])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (isTypingTarget(event.target) || !activeReview) return
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        goPrevious()
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        goNext()
+      } else if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault()
+        handleSave(activeReview.id, 'next')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeReview, goNext, goPrevious, handleSave])
 
   function confirmModelResult() {
     if (!activeReview) return

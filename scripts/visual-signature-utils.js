@@ -22,12 +22,16 @@ function cosineSimilarity(left, right) {
   return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm))
 }
 
-async function buildVisualSignature(filePath, detection) {
-  if (!filePath || !hasUsableBox(detection)) return null
+function normalizeVector(values) {
+  if (!values.length) return values
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length
+  const deviation = Math.sqrt(variance) || 1
 
-  const image = sharp(filePath, { failOn: 'none' })
-  const metadata = await image.metadata()
+  return values.map((value) => Number(((value - mean) / deviation).toFixed(4)))
+}
 
+function getCropBounds(metadata, detection) {
   if (!metadata.width || !metadata.height) return null
 
   const paddingX = Math.max(4, (Number(detection.x2) - Number(detection.x1)) * 0.08)
@@ -36,31 +40,153 @@ async function buildVisualSignature(filePath, detection) {
   const top = Math.max(0, Math.floor(Number(detection.y1) - paddingY))
   const right = Math.min(metadata.width, Math.ceil(Number(detection.x2) + paddingX))
   const bottom = Math.min(metadata.height, Math.ceil(Number(detection.y2) + paddingY))
-  const width = Math.max(1, right - left)
-  const height = Math.max(1, bottom - top)
 
-  const raw = await sharp(filePath, { failOn: 'none' })
-    .extract({ left, top, width, height })
-    .resize(16, 16, { fit: 'fill' })
-    .greyscale()
-    .raw()
-    .toBuffer()
+  return {
+    height: Math.max(1, bottom - top),
+    left,
+    top,
+    width: Math.max(1, right - left)
+  }
+}
 
-  const mean = raw.reduce((sum, value) => sum + value, 0) / Math.max(1, raw.length)
-  const variance = raw.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(1, raw.length)
-  const deviation = Math.sqrt(variance) || 1
+function buildTextureFeatures(raw, size) {
+  const features = []
+  const cells = 4
+  const cellSize = size / cells
 
-  return Array.from(raw, (value) => Number(((value - mean) / deviation).toFixed(4)))
+  for (let cellY = 0; cellY < cells; cellY += 1) {
+    for (let cellX = 0; cellX < cells; cellX += 1) {
+      const values = []
+      for (let y = cellY * cellSize; y < (cellY + 1) * cellSize; y += 1) {
+        for (let x = cellX * cellSize; x < (cellX + 1) * cellSize; x += 1) {
+          values.push(raw[y * size + x])
+        }
+      }
+      const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+      const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length
+      features.push(mean / 255, Math.sqrt(variance) / 128)
+    }
+  }
+
+  return features
+}
+
+function buildEdgeFeatures(raw, size) {
+  const features = []
+  const cells = 4
+  const cellSize = size / cells
+
+  for (let cellY = 0; cellY < cells; cellY += 1) {
+    for (let cellX = 0; cellX < cells; cellX += 1) {
+      let total = 0
+      let count = 0
+      for (let y = Math.max(1, cellY * cellSize); y < Math.min(size - 1, (cellY + 1) * cellSize); y += 1) {
+        for (let x = Math.max(1, cellX * cellSize); x < Math.min(size - 1, (cellX + 1) * cellSize); x += 1) {
+          const gx = raw[y * size + x + 1] - raw[y * size + x - 1]
+          const gy = raw[(y + 1) * size + x] - raw[(y - 1) * size + x]
+          total += Math.sqrt(gx ** 2 + gy ** 2)
+          count += 1
+        }
+      }
+      features.push(count ? total / count / 255 : 0)
+    }
+  }
+
+  return features
+}
+
+function buildColorFeatures(raw) {
+  const bins = 8
+  const histograms = [Array(bins).fill(0), Array(bins).fill(0), Array(bins).fill(0)]
+  const pixelCount = Math.max(1, raw.length / 3)
+
+  for (let index = 0; index < raw.length; index += 3) {
+    histograms[0][Math.min(bins - 1, Math.floor(raw[index] / 32))] += 1
+    histograms[1][Math.min(bins - 1, Math.floor(raw[index + 1] / 32))] += 1
+    histograms[2][Math.min(bins - 1, Math.floor(raw[index + 2] / 32))] += 1
+  }
+
+  return histograms.flat().map((value) => value / pixelCount)
+}
+
+async function buildSignatureForOrientation(filePath, bounds, mirror) {
+  const base = sharp(filePath, { failOn: 'none' }).extract(bounds).resize(32, 32, { fit: 'fill' })
+  const oriented = mirror ? base.flop() : base
+  const [greyscale, color] = await Promise.all([
+    oriented.clone().greyscale().raw().toBuffer(),
+    oriented.clone().removeAlpha().raw().toBuffer()
+  ])
+  const pixelFeatures = normalizeVector(Array.from(greyscale, (value) => value / 255))
+
+  return normalizeVector([
+    ...pixelFeatures,
+    ...buildTextureFeatures(greyscale, 32),
+    ...buildEdgeFeatures(greyscale, 32),
+    ...buildColorFeatures(color)
+  ])
+}
+
+async function buildVisualDescriptor(filePath, detection, mirror = false) {
+  if (!filePath || !hasUsableBox(detection)) return null
+
+  const metadata = await sharp(filePath, { failOn: 'none' }).metadata()
+  const bounds = getCropBounds(metadata, detection)
+  if (!bounds) return null
+
+  const base = sharp(filePath, { failOn: 'none' }).extract(bounds).resize(32, 32, { fit: 'fill' })
+  const oriented = mirror ? base.flop() : base
+  const [greyscale, color] = await Promise.all([
+    oriented.clone().greyscale().raw().toBuffer(),
+    oriented.clone().removeAlpha().raw().toBuffer()
+  ])
+
+  return {
+    color: buildColorFeatures(color),
+    edge: buildEdgeFeatures(greyscale, 32),
+    spatial: normalizeVector(Array.from(greyscale, (value) => value / 255)),
+    texture: buildTextureFeatures(greyscale, 32)
+  }
+}
+
+function toPercentSimilarity(value) {
+  return value === null ? null : Math.max(0, Math.min(1, value))
+}
+
+function compareDescriptors(left, right) {
+  if (!left || !right) return null
+
+  const color = toPercentSimilarity(cosineSimilarity(left.color, right.color))
+  const texture = toPercentSimilarity(cosineSimilarity(left.texture, right.texture))
+  const edge = toPercentSimilarity(cosineSimilarity(left.edge, right.edge))
+  const spatial = toPercentSimilarity(cosineSimilarity(left.spatial, right.spatial))
+
+  if (color === null || texture === null || edge === null || spatial === null) return null
+
+  return (color * 0.5) + (texture * 0.25) + (edge * 0.15) + (spatial * 0.1)
+}
+
+async function buildVisualSignature(filePath, detection, mirror = false) {
+  if (!filePath || !hasUsableBox(detection)) return null
+
+  const image = sharp(filePath, { failOn: 'none' })
+  const metadata = await image.metadata()
+  const bounds = getCropBounds(metadata, detection)
+
+  return bounds ? buildSignatureForOrientation(filePath, bounds, mirror) : null
 }
 
 async function compareDetectionCrops(leftPath, leftDetection, rightPath, rightDetection) {
-  const [leftSignature, rightSignature] = await Promise.all([
-    buildVisualSignature(leftPath, leftDetection),
-    buildVisualSignature(rightPath, rightDetection)
+  const [leftDescriptor, rightDescriptor, mirroredRightDescriptor] = await Promise.all([
+    buildVisualDescriptor(leftPath, leftDetection),
+    buildVisualDescriptor(rightPath, rightDetection),
+    buildVisualDescriptor(rightPath, rightDetection, true)
   ])
-  const similarity = cosineSimilarity(leftSignature, rightSignature)
+  const similarity = Math.max(
+    compareDescriptors(leftDescriptor, rightDescriptor) ?? -1,
+    compareDescriptors(leftDescriptor, mirroredRightDescriptor) ?? -1
+  )
 
-  return similarity === null ? null : Math.round(Math.max(0, Math.min(1, similarity)) * 100)
+  return similarity < 0 ? null : Math.round(Math.max(0, Math.min(1, similarity)) * 100)
 }
 
 module.exports = {

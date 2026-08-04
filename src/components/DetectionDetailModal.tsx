@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Maximize2, Minus, Move, Plus, ScanLine, X } from 'lucide-react'
 import { getSpeciesLabel } from '@/lib/i18n'
@@ -241,7 +242,13 @@ export default function DetectionDetailModal({
             <div><span>Fecha de procesamiento</span><strong>{formatDateTime(detection.createdAt)}</strong></div>
             <div>
               <span>Reencuentro</span>
-              <strong>{getIndividualLabel(detection)}</strong>
+              {detection.individualId ? (
+                <Link className="individualInlineLink" href={`/individuals/${detection.individualId}`}>
+                  {getIndividualLabel(detection)}
+                </Link>
+              ) : (
+                <strong>{getIndividualLabel(detection)}</strong>
+              )}
               <small>
                 {detection.individualMatchStatus ?? 'Sin analisis'}
                 {formatMatchConfidence(detection.individualMatchConfidence) ? ` · ${formatMatchConfidence(detection.individualMatchConfidence)}` : ''}

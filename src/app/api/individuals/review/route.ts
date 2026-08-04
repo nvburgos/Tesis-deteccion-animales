@@ -150,6 +150,7 @@ export async function POST(request: NextRequest) {
     const referenceIndividual = referenceDetection.individualId
       ? { id: referenceDetection.individualId }
       : await createIndividual(referenceDetection.species)
+    const candidateIndividualId = candidateDetection.individualId
 
     await prisma.detection.update({
       where: { id: referenceDetection.id },
@@ -161,8 +162,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    await prisma.detection.update({
-      where: { id: candidateDetection.id },
+    await prisma.detection.updateMany({
+      where: candidateIndividualId
+        ? { individualId: candidateIndividualId, species: candidateDetection.species }
+        : { id: candidateDetection.id },
       data: {
         individualId: referenceIndividual.id,
         individualMatchBasis: `confirmado manualmente con deteccion #${referenceDetection.id}`,
@@ -170,6 +173,15 @@ export async function POST(request: NextRequest) {
         individualMatchStatus: 'Confirmado manualmente'
       }
     })
+
+    if (candidateIndividualId && candidateIndividualId !== referenceIndividual.id) {
+      await prisma.individual.deleteMany({
+        where: {
+          detections: { none: {} },
+          id: candidateIndividualId
+        }
+      })
+    }
 
     return NextResponse.json({ decision: body.decision, individualId: referenceIndividual.id })
   }

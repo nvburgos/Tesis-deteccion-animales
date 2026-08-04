@@ -48,6 +48,10 @@ export type DetectionResultData = {
     species: string
     label: string | null
   } | null
+  previousSameSpeciesCount?: number
+  sameSpeciesLastDetectedAt?: string | null
+  sameSpeciesLastLocation?: string | null
+  sameSpeciesStatus?: string
 }
 
 export type RecentDetection = {
