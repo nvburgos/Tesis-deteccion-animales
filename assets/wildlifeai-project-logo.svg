@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="120" viewBox="0 0 420 120" role="img" aria-labelledby="title desc">
+  <title id="title">WildlifeAI</title>
+  <desc id="desc">Logo horizontal de WildlifeAI exportado desde la identidad visual del proyecto.</desc>
+  <rect width="420" height="120" rx="0" fill="#ffffff"/>
+  <g transform="translate(42 35)" fill="none" stroke="#004431" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 19.072V14a8 8 0 0 1 8-8h3a1 1 0 0 1 1 1v3a8 8 0 0 1-8 8 8 8 0 0 0-8 8c0 4 2 6 2 10a10 10 0 0 1-2 6"/>
+    <path d="M8 18a10 10 0 0 1 16 8 10 10 0 0 1-16-8"/>
+    <path d="M10 42h28"/>
+  </g>
+  <text x="108" y="73" fill="#004431" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="800" letter-spacing="0">WildlifeAI</text>
+</svg>

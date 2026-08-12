@@ -1417,6 +1417,15 @@ WildlifeAI se ejecuta como cinco piezas coordinadas:
 | `DATABASE_URL` | Conexion PostgreSQL usada por Prisma. |
 | `AUTH_SECRET` | Secreto HMAC de sesiones. Obligatorio en produccion. |
 | `ALLOW_PUBLIC_REGISTRATION` | Controla registro publico. Recomendado `false`. |
+| `RESEND_API_KEY` | API key de Resend para enviar OTP por correo y notificaciones de lotes. En desarrollo, si no existe, el OTP se imprime en consola. |
+| `EMAIL_FROM` | Remitente verificado para correos transaccionales. |
+| `META_WHATSAPP_ACCESS_TOKEN` | Token permanente o de sistema para enviar mensajes con WhatsApp Cloud API. |
+| `META_WHATSAPP_PHONE_NUMBER_ID` | ID del numero de telefono de WhatsApp Business en Meta. |
+| `META_WHATSAPP_API_VERSION` | Version de Graph API usada para mensajes. Valor por defecto: `v23.0`. |
+| `META_WHATSAPP_TEMPLATE_LANGUAGE` | Idioma de las plantillas aprobadas. Valor por defecto: `es`. |
+| `META_WHATSAPP_OTP_TEMPLATE_NAME` | Plantilla aprobada de autenticacion para enviar el OTP de registro. |
+| `META_WHATSAPP_OTP_BUTTON_SUBTYPE` | Tipo del boton OTP de la plantilla. Valor por defecto: `copy_code`. |
+| `META_WHATSAPP_BATCH_TEMPLATE_NAME` | Plantilla aprobada para avisar al investigador cuando termina un lote. |
 | `PYTHON_BIN` | Ejecutable Python usado por Next.js y worker. |
 | `YOLO_MODEL_PATH` | Modelo local de respaldo si aplica. |
 | `STORAGE_ROOT` | Raiz privada de almacenamiento. Recomendado `storage`. |

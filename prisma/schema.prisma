@@ -158,6 +158,9 @@ model User {
   id                 Int         @id @default(autoincrement())
   name               String
   email              String      @unique
+  emailVerifiedAt    DateTime?
+  phoneNumber        String?
+  whatsappVerifiedAt DateTime?
   passwordHash       String
   institution        String?
   role               String      @default("Investigador")
@@ -166,6 +169,42 @@ model User {
   reviewedDetections Detection[] @relation("DetectionReviewer")
   batchJobs          BatchJob[]
   trainingSamples    TrainingSample[]
+  whatsappOtps       WhatsAppOtp[]
+  registrationOtps   RegistrationOtp[]
+
+  @@index([phoneNumber])
+}
+
+model WhatsAppOtp {
+  id          Int       @id @default(autoincrement())
+  email       String
+  phoneNumber String
+  codeHash    String
+  attempts    Int       @default(0)
+  consumedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  userId      Int?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([expiresAt])
+}
+
+model RegistrationOtp {
+  id          Int       @id @default(autoincrement())
+  email       String
+  codeHash    String
+  attempts    Int       @default(0)
+  consumedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  userId      Int?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([expiresAt])
 }
 
 model Camera {

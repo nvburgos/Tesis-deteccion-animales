@@ -12,6 +12,8 @@ const {
   getWorkerConfig
 } = require('./batch-worker-utils')
 const { assignIndividualMatchForPrisma } = require('./individual-matching-utils')
+const { notifyBatchFinishedByEmail } = require('./email-notifications')
+const { notifyBatchFinished } = require('./whatsapp-notifications')
 
 function loadDotenv() {
   const envPath = path.join(process.cwd(), '.env')
@@ -197,6 +199,30 @@ async function touchHeartbeat(jobId) {
     data: { heartbeatAt: new Date() },
     where: { id: jobId, status: 'Procesando', workerId: workerConfig.workerId }
   })
+}
+
+async function notifyBatchCompletion(job, status) {
+  try {
+    const emailResult = await notifyBatchFinishedByEmail(job, status)
+    if (emailResult?.skipped) {
+      console.log(`[email] Notificacion de lote omitida id=${job.id}: ${emailResult.reason}`)
+    } else {
+      console.log(`[email] Notificacion de lote enviada id=${job.id} status=${status}`)
+    }
+  } catch (error) {
+    logException(`[email] No se pudo enviar notificacion del lote ${job.id}`, error)
+  }
+
+  try {
+    const result = await notifyBatchFinished(job, status)
+    if (result?.skipped) {
+      console.log(`[whatsapp] Notificacion de lote omitida id=${job.id}: ${result.reason}`)
+    } else {
+      console.log(`[whatsapp] Notificacion de lote enviada id=${job.id} status=${status}`)
+    }
+  } catch (error) {
+    logException(`[whatsapp] No se pudo enviar notificacion del lote ${job.id}`, error)
+  }
 }
 
 function startHeartbeat(jobId) {
@@ -409,7 +435,7 @@ async function claimNextJob() {
   return withStep(3, 'Cargando lote reclamado', () => prisma.batchJob.findUnique({
     include: {
       camera: { select: { id: true, name: true, zone: true } },
-      user: { select: { id: true, name: true } }
+      user: { select: { email: true, id: true, name: true, phoneNumber: true } }
     },
     where: { id: pendingJob.id }
   }), `id=${pendingJob.id}`)
@@ -578,6 +604,10 @@ async function markJobFailure(job, error) {
     data,
     where: { id: job.id, status: 'Procesando', workerId: workerConfig.workerId }
   }), `id=${job.id} retry=${canRetry}`)
+  if (!canRetry) {
+    job.failedImages = job.failedImages || Math.max(0, (job.totalImages || 0) - (job.processedImages || 0))
+    await notifyBatchCompletion(job, 'Fallido')
+  }
 }
 
 async function processJob(job) {
@@ -619,6 +649,9 @@ async function processJob(job) {
         },
         where: { id: job.id, status: 'Procesando', workerId: workerConfig.workerId }
       }))
+      job.failedImages = 0
+      job.processedImages = 0
+      await notifyBatchCompletion(job, 'Fallido')
       return
     }
 
@@ -638,6 +671,9 @@ async function processJob(job) {
         data: { completedAt: new Date(), failedImages: failedCopies, heartbeatAt: null, processedImages: skippedExisting, status, workerId: null },
         where: { id: job.id, status: 'Procesando', workerId: workerConfig.workerId }
       }), `status=${status}`)
+      job.failedImages = failedCopies
+      job.processedImages = skippedExisting
+      await notifyBatchCompletion(job, status)
       return
     }
 
@@ -658,6 +694,9 @@ async function processJob(job) {
       },
       where: { id: job.id, status: 'Procesando', workerId: workerConfig.workerId }
     }), `status=${status}`)
+    job.failedImages = result.failedImages
+    job.processedImages = result.processedImages
+    await notifyBatchCompletion(job, status)
 
     console.log(`[18] Tiempo total del lote: ${formatSeconds(batchStart)} segundos`)
     console.log(`[18] Tiempo total guardando en PostgreSQL: ${(result.dbSaveMs / 1000).toFixed(2)} segundos`)
