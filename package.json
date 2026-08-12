@@ -6,6 +6,8 @@
                     "dev":  "next dev",
                     "build":  "next build",
                     "start":  "next start",
+                    "railway:web":  "prisma migrate deploy && next start",
+                    "railway:worker":  "node scripts/batch-worker.js",
                     "typecheck":  "tsc --noEmit",
                     "lint":  "eslint src scripts tests next.config.ts --cache --cache-location .next/cache/eslint/",
                     "prisma:generate":  "prisma generate",

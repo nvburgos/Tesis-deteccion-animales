@@ -1,0 +1,15 @@
+.git
+.next
+.venv
+node_modules
+public/uploads
+storage
+tmp
+.tmp
+python/dataset
+python/datasets_raw
+python/runs
+*.log
+tsconfig.tsbuildinfo
+.env
+.env.local
