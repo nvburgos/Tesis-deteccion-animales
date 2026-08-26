@@ -39,6 +39,7 @@ python/runs/
 # ===========================
 .env
 .env.local
+.env.production
 
 # ===========================
 # VS Code

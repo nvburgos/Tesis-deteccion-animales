@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wildlifeai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: wildlifeai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wildlifeai -d wildlifeai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: npm run railway:web
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgresql://wildlifeai:${POSTGRES_PASSWORD}@db:5432/wildlifeai?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - storage:/app/storage
+      - model_cache:/root/.cache
+    expose:
+      - "3000"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: npm run railway:worker
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgresql://wildlifeai:${POSTGRES_PASSWORD}@db:5432/wildlifeai?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - storage:/app/storage
+      - model_cache:/root/.cache
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
+  storage:
+  model_cache:
+  caddy_data:
+  caddy_config:
